@@ -3,7 +3,6 @@ pub mod state;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, MintTo, Transfer};
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use state::*;
 
 declare_id!("7MHr6ZPGTWZkRk6m52GfEWoMxSV7EoDjYyoXAYf3MBwS");
@@ -25,37 +24,39 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
-        msg!("Instruction: Stake");
+    pub fn miner_register(ctx: Context<Stake>, amount: u64) -> Result<()> {
+        msg!("Instruction: Miner register");
 
-        let user_info = &mut ctx.accounts.user_info;
-        let clock = Clock::get()?;
+        // let user_info = &mut ctx.accounts.user_info;
+        // let clock = Clock::get()?;
 
-        if user_info.amount > 0 {
-            let reward = (clock.slot - user_info.deposit_slot) - user_info.reward_debt;
+        // if user_info.amount > 0 {
+        //     let reward = (clock.slot - user_info.deposit_slot) - user_info.reward_debt;
 
-            let cpi_accounts = MintTo {
-                mint: ctx.accounts.staking_token.to_account_info(),
-                to: ctx.accounts.user_staking_wallet.to_account_info(),
-                authority: ctx.accounts.admin.to_account_info(),
-            };
-            let cpi_program = ctx.accounts.token_program.to_account_info();
-            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-            token::mint_to(cpi_ctx, reward)?;
-        }
+        //     let cpi_accounts = MintTo {
+        //         mint: ctx.accounts.staking_token.to_account_info(),
+        //         to: ctx.accounts.user_staking_wallet.to_account_info(),
+        //         authority: ctx.accounts.admin.to_account_info(),
+        //     };
+        //     let cpi_program = ctx.accounts.token_program.to_account_info();
+        //     let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        //     token::mint_to(cpi_ctx, reward)?;
+        // }
 
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.user_staking_wallet.to_account_info(),
-            to: ctx.accounts.admin_staking_wallet.to_account_info(),
-            authority: ctx.accounts.user.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        token::transfer(cpi_ctx, amount)?;
+        // let cpi_accounts = Transfer {
+        //     from: ctx.accounts.user_staking_wallet.to_account_info(),
+        //     to: ctx.accounts.admin_staking_wallet.to_account_info(),
+        //     authority: ctx.accounts.user.to_account_info(),
+        // };
+        // let cpi_program = ctx.accounts.token_program.to_account_info();
+        // let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        // token::transfer(cpi_ctx, amount)?;
 
-        user_info.amount += amount;
-        user_info.deposit_slot = clock.slot;
-        user_info.reward_debt = 0;
+        // user_info.amount += amount;
+        // user_info.deposit_slot = clock.slot;
+        // user_info.reward_debt = 0;
+
+        
 
         Ok(())
     }
@@ -114,36 +115,4 @@ pub mod solearn {
 
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(mut)]
-    pub admin: Signer<'info>,
-    #[account(init, payer = admin, space = 8 + PoolInfo::LEN)]
-    pub pool_info: Account<'info, PoolInfo>,
-    #[account(mut)]
-    pub staking_token: InterfaceAccount<'info, Mint>,
-    #[account(mut)]
-    pub admin_staking_wallet: InterfaceAccount<'info, TokenAccount>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct Stake<'info> {
-    #[account(mut)]
-    pub user: Signer<'info>,
-    /// CHECK:
-    #[account(mut)]
-    pub admin: AccountInfo<'info>,
-    #[account(init, payer = user, space = 8 + UserInfo::LEN)]
-    pub user_info: Account<'info, UserInfo>,
-    #[account(mut)]
-    pub user_staking_wallet: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut)]
-    pub admin_staking_wallet: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut)]
-    pub staking_token: InterfaceAccount<'info, Mint>,
-    pub token_program: Interface<'info, TokenInterface>,
-    pub system_program: Program<'info, System>,
 }
