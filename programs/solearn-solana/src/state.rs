@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-
 // init pda to store list of models
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -87,10 +86,10 @@ pub struct MinerRegister<'info> {
     pub miner_staking_wallet: InterfaceAccount<'info, TokenAccount>,
     #[account(
         seeds = [b"vault", sol_learn_account.key().as_ref()], 
-        bump = vault_wallet_owner.bump,
+        bump = vault_wallet_owner_pda.bump,
     )]
-    pub vault_wallet_owner: Account<'info, VaultAccount>,
-    #[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner.key())]
+    pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+    #[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner_pda.key())]
     pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
     #[account(mut)]
     pub staking_token: InterfaceAccount<'info, Mint>,
@@ -167,12 +166,13 @@ impl SolLearnInfo {
 pub struct MinerInfo {
     pub bump: u8,
     pub miner: Pubkey,
+    pub model: Pubkey,
     pub stake_amount: u64,
     pub last_epoch: u64,
 }
 
 impl MinerInfo {
-    pub const LEN: usize = 32 + 8 + 8 + 32;
+    pub const LEN: usize = 1 + 32 + 32 + 8 + 8;
 }
 
 #[account]
@@ -192,4 +192,14 @@ pub struct Models {
 
 impl Models {
     pub const LEN: usize = 32 + 4;
+}
+
+
+// EVENTS
+
+#[event]
+pub struct MinerRegistration {
+    pub miner: Pubkey,
+    pub stake_amount: u64,
+    pub model_address: Pubkey,
 }
