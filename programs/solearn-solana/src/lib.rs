@@ -2,7 +2,7 @@ pub mod errors;
 pub mod state;
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{TransferChecked, transfer_checked};
+use anchor_spl::token::{self, Transfer};
 use state::*;
 use errors::*;
 
@@ -67,30 +67,39 @@ pub mod solearn {
         miner_info.model = model;
         ctx.accounts.sol_learn_account.total_miner += 1;
 
-        let decimals = ctx.accounts.staking_token.decimals;
-        let solean_key = ctx.accounts.sol_learn_account.key().clone();
+        // this used for unstaking 
+        // let decimals = ctx.accounts.staking_token.decimals;
+        // let solean_key = ctx.accounts.sol_learn_account.key().clone();
+        // let seeds = &[
+        //     &b"vault"[..], solean_key.as_ref()
+        // ];
 
-        let seeds = &[
-            &b"vault"[..], solean_key.as_ref()
-        ];
+        // let signer_seeds = &[&seeds[..]];
 
-        let signer_seeds = &[&seeds[..]];
+        // // transfer token to contract
+        // let cpi_accounts = TransferChecked {
+        //     from: ctx.accounts.miner_staking_wallet.to_account_info(),
+        //     to: ctx.accounts.vault_staking_wallet.to_account_info(),
+        //     authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+        //     mint: ctx.accounts.staking_token.clone().to_account_info()
+        // };
 
-        // transfer token to contract
-        let cpi_accounts = TransferChecked {
+        // let ctx_transfer_token = CpiContext::new_with_signer(
+        //     ctx.accounts.token_program.to_account_info(),
+        //     cpi_accounts,
+        //     signer_seeds
+        // );
+
+        // transfer_checked(ctx_transfer_token, stake_amount, decimals)?;
+
+        let cpi_accounts = Transfer {
             from: ctx.accounts.miner_staking_wallet.to_account_info(),
             to: ctx.accounts.vault_staking_wallet.to_account_info(),
-            authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
-            mint: ctx.accounts.staking_token.clone().to_account_info()
+            authority: ctx.accounts.miner.to_account_info(),
         };
-
-        let ctx_transfer_token = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            cpi_accounts,
-            signer_seeds
-        );
-
-        transfer_checked(ctx_transfer_token, stake_amount, decimals)?;
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        token::transfer(cpi_ctx, stake_amount)?;
         
         // emit event
         emit!(MinerRegistration {
