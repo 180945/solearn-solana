@@ -117,35 +117,20 @@ pub struct MinerRegister<'info> {
 //     pub token_program: Interface<'info, TokenInterface>,
 // }
 
-// #[derive(Accounts)]
-// pub struct ClaimReward<'info> {
-//     /// CHECK:
-//     #[account(mut)]
-//     pub user: AccountInfo<'info>,
-//     /// CHECK:
-//     #[account(mut)]
-//     pub admin: AccountInfo<'info>,
-//     #[account(mut)]
-//     pub user_info: Account<'info, UserInfo>,
-//     #[account(mut)]
-//     pub user_staking_wallet: InterfaceAccount<'info, TokenAccount>,
-//     #[account(mut)]
-//     pub admin_staking_wallet: InterfaceAccount<'info, TokenAccount>,
-//     #[account(mut)]
-//     pub staking_token: InterfaceAccount<'info, Mint>,
-//     pub token_program: Interface<'info, TokenInterface>,
-// }
 
-// #[account]
-// pub struct UserInfo {
-//     pub amount: u64,
-//     pub reward_debt: u64,
-//     pub deposit_slot: u64,
-// }
+#[derive(Accounts)]
+pub struct JoinForMinting<'info> {
+    #[account(mut)]
+    pub miner: Signer<'info>,
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    /// CHECK:
+    #[account(
+        seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
+        bump,
+    )]
+    pub miner_account: Account<'info, MinerInfo>,
+}
 
-// impl UserInfo {
-//     pub const LEN: usize = 8 + 8 + 8;
-// }
 
 // Contract info
 #[account]
@@ -169,6 +154,7 @@ pub struct MinerInfo {
     pub model: Pubkey,
     pub stake_amount: u64,
     pub last_epoch: u64,
+    pub active_epoch: u64,
 }
 
 impl MinerInfo {
@@ -196,10 +182,14 @@ impl Models {
 
 
 // EVENTS
-
 #[event]
 pub struct MinerRegistration {
     pub miner: Pubkey,
     pub stake_amount: u64,
     pub model_address: Pubkey,
+}
+
+#[event]
+pub struct MinerJoin {
+    pub miner: Pubkey,
 }

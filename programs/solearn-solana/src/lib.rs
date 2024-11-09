@@ -111,6 +111,44 @@ pub mod solearn {
         Ok(())
     }
 
+    pub fn join_for_minting(ctx: Context<JoinForMinting>) -> Result<()> {
+        msg!("Instruction: Join For Minting");
+
+        // Assuming _updateEpoch() is a function that updates the epoch based on the current clock
+        // _update_epoch(&ctx.accounts.sysvar_clock)?;
+
+        
+
+        // let miner_info = &mut ctx.accounts.miner_info;
+        // if miner_info.bump == 0 {
+        //     return Err(FromBytesError::BufferTooSmall.into());
+        // }
+        // if miner_info.stake_amount < ctx.accounts.sol_learn_account.miner_min_stake {
+        //     return Err(FromBytesError::BufferTooSmall.into());
+        // }
+        // let current_time = std::time::SystemTime::now()
+        //     .duration_since(std::time::UNIX_EPOCH)
+        //     .expect("Time went backwards")
+        //     .as_secs();
+        // if current_time < miner_info.last_epoch {
+        //     return Err(FromBytesError::BufferTooSmall.into());
+        // }
+
+        // let model_address = miner_info.model;
+        // // Assuming miner_addresses_by_model and miner_addresses are maps that need to be updated
+        // // miner_addresses_by_model[model_address].insert(ctx.accounts.miner.key);
+        // // miner_addresses.insert(ctx.accounts.miner.key);
+        // miner_info.last_epoch = current_time;
+        // // Assuming boost is a map that needs to be updated
+        // // boost[ctx.accounts.miner.key].miner_timestamp = current_time as u64;
+
+        // emit!(MinerJoin {
+        //     miner: *ctx.accounts.miner.key,
+        // });
+
+        Ok(())
+    }
+
     // pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
     //     msg!("Instruction: Unstake");
 
