@@ -29,6 +29,7 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(model: Pubkey)]
 pub struct AddModel<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
@@ -37,13 +38,21 @@ pub struct AddModel<'info> {
     pub sol_learn_account: Account<'info, SolLearnInfo>,
     #[account(
         mut,
-        realloc = 8 + 8 + 4 + models.data.len(),
+        realloc = 8 + 1 + 4 + models.data.len() + 32,
         realloc::payer = admin,
         realloc::zero = false,
         seeds = [b"models", sol_learn_account.key().as_ref()], 
         bump = models.bump,
     )]
     pub models: Account<'info, Models>,
+    #[account(
+        init, 
+        payer = admin, 
+        space = 8 + AddressesOfModel::LEN,
+        seeds = [b"models", sol_learn_account.key().as_ref(), model.key().as_ref()], 
+        bump
+    )]
+    pub addresses_of_model: Account<'info, AddressesOfModel>,
     pub system_program: Program<'info, System>,
 }
 
@@ -117,7 +126,6 @@ pub struct MinerRegister<'info> {
 //     pub token_program: Interface<'info, TokenInterface>,
 // }
 
-
 #[derive(Accounts)]
 pub struct JoinForMinting<'info> {
     #[account(mut)]
@@ -125,12 +133,46 @@ pub struct JoinForMinting<'info> {
     pub sol_learn_account: Account<'info, SolLearnInfo>,
     /// CHECK:
     #[account(
+        mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
         bump,
     )]
     pub miner_account: Account<'info, MinerInfo>,
+    #[account(
+        mut, 
+        realloc = 8 + 1 + 4 + addresses_of_model.data.len() + 32,
+        realloc::payer = miner,
+        realloc::zero = false,
+        seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
+        bump
+    )]
+    pub addresses_of_model: Account<'info, AddressesOfModel>,
+    pub models: Account<'info, Models>,
+    pub system_program: Program<'info, System>,
+    pub sysvar_clock: Sysvar<'info, Clock>,
 }
 
+#[derive(Accounts)]
+pub struct ReJoinForMinting<'info> {
+    #[account(mut)]
+    pub miner: Signer<'info>,
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    /// CHECK:
+    #[account(
+        mut,
+        seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
+        bump,
+    )]
+    pub miner_account: Account<'info, MinerInfo>,
+    #[account(
+        seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
+        bump
+    )]
+    pub addresses_of_model: Account<'info, AddressesOfModel>,
+    pub models: Account<'info, Models>,
+    pub system_program: Program<'info, System>,
+    pub sysvar_clock: Sysvar<'info, Clock>,
+}
 
 // Contract info
 #[account]
@@ -141,6 +183,9 @@ pub struct SolLearnInfo {
     pub total_models: u64,
     pub total_infer: u64,
     pub miner_min_stake: u64,
+    pub unstake_delay_time: u64,
+    pub reward_per_slot: u64,
+    pub mine_fee_to_use: u64,
 }
 
 impl SolLearnInfo {
@@ -152,13 +197,15 @@ pub struct MinerInfo {
     pub bump: u8,
     pub miner: Pubkey,
     pub model: Pubkey,
+    pub model_index: u64, // plus one already to make sure > 0
     pub stake_amount: u64,
-    pub last_epoch: u64,
-    pub active_epoch: u64,
+    pub last_time: u64,
+    pub active_time: u64,
+    pub is_active: bool,
 }
 
 impl MinerInfo {
-    pub const LEN: usize = 1 + 32 + 32 + 8 + 8;
+    pub const LEN: usize = 1 + 32 + 32 + 8 + 8 + 8 + 8 + 1;
 }
 
 #[account]
@@ -177,8 +224,29 @@ pub struct Models {
 }
 
 impl Models {
-    pub const LEN: usize = 32 + 4;
+    pub const LEN: usize = 1 + 4;
 }
+
+#[account]
+pub struct AddressesOfModel {
+    pub bump: u8, 
+    pub data: Vec<u8>,
+}
+
+impl AddressesOfModel {
+    pub const LEN: usize = 1 + 4;
+}
+
+#[account]
+pub struct JoingMintingFlag {
+    pub bump: u8,
+    pub miner: Pubkey,
+    pub model: Pubkey,
+    pub stake_amount: u64,
+    pub last_time: u64,
+    pub active_time: u64,
+}
+
 
 
 // EVENTS
@@ -191,5 +259,10 @@ pub struct MinerRegistration {
 
 #[event]
 pub struct MinerJoin {
+    pub miner: Pubkey,
+}
+
+#[event]
+pub struct MinerReJoin {
     pub miner: Pubkey,
 }

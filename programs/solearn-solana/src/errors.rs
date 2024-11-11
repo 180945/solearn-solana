@@ -4,4 +4,8 @@ use anchor_lang::prelude::*;
 pub enum SolLearnError {
     MustGreatThanMinStake,
     NoModelRegistered,
+    NotAcitveYet,
+    Joined,
+    Activated,
+    MustJoinMintingFirst,
 }

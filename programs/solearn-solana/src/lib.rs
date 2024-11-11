@@ -55,7 +55,7 @@ pub mod solearn {
         // set miner info 
         let miner_info = &mut ctx.accounts.miner_info;
         miner_info.stake_amount = stake_amount;
-        miner_info.last_epoch = ctx.accounts.sysvar_clock.epoch;
+        miner_info.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
 
         if ctx.accounts.models.data.len() == 0 {
             return Err(SolLearnError::NoModelRegistered.into())
@@ -117,37 +117,64 @@ pub mod solearn {
         // Assuming _updateEpoch() is a function that updates the epoch based on the current clock
         // _update_epoch(&ctx.accounts.sysvar_clock)?;
 
-        
+        if ctx.accounts.sol_learn_account.miner_min_stake > ctx.accounts.miner_account.stake_amount {
+            return Err(SolLearnError::MustGreatThanMinStake.into())
+        }
 
-        // let miner_info = &mut ctx.accounts.miner_info;
-        // if miner_info.bump == 0 {
-        //     return Err(FromBytesError::BufferTooSmall.into());
-        // }
-        // if miner_info.stake_amount < ctx.accounts.sol_learn_account.miner_min_stake {
-        //     return Err(FromBytesError::BufferTooSmall.into());
-        // }
-        // let current_time = std::time::SystemTime::now()
-        //     .duration_since(std::time::UNIX_EPOCH)
-        //     .expect("Time went backwards")
-        //     .as_secs();
-        // if current_time < miner_info.last_epoch {
-        //     return Err(FromBytesError::BufferTooSmall.into());
-        // }
+        // get active time
+        if ctx.accounts.miner_account.active_time > (ctx.accounts.sysvar_clock.unix_timestamp as u64) {
+            return Err(SolLearnError::NotAcitveYet.into())
+        }
 
-        // let model_address = miner_info.model;
-        // // Assuming miner_addresses_by_model and miner_addresses are maps that need to be updated
-        // // miner_addresses_by_model[model_address].insert(ctx.accounts.miner.key);
-        // // miner_addresses.insert(ctx.accounts.miner.key);
-        // miner_info.last_epoch = current_time;
-        // // Assuming boost is a map that needs to be updated
-        // // boost[ctx.accounts.miner.key].miner_timestamp = current_time as u64;
+        if ctx.accounts.miner_account.model_index > 0 {
+            return Err(SolLearnError::Joined.into())
+        }
 
-        // emit!(MinerJoin {
-        //     miner: *ctx.accounts.miner.key,
-        // });
+        // insert model address
+        let addresses_of_model = &mut ctx.accounts.addresses_of_model;
+        addresses_of_model.data.extend_from_slice(ctx.accounts.miner.key().as_ref());
+
+        // update miner join time
+        ctx.accounts.miner_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+        ctx.accounts.miner_account.is_active = true;
+        ctx.accounts.miner_account.model_index = (addresses_of_model.data.len() / 32 + 1) as u64;
+        emit!(MinerJoin {
+            miner: *ctx.accounts.miner.key,
+        });
 
         Ok(())
     }
+
+    // this handle case when miner slashed and wanna join mining again
+    pub fn rejoin_mining(ctx: Context<ReJoinForMinting>) -> Result<()> {
+        msg!("Instruction: ReJoin For Minting");
+
+        // Assuming _updateEpoch() is a function that updates the epoch based on the current clock
+        // _update_epoch(&ctx.accounts.sysvar_clock)?;
+
+        if ctx.accounts.miner_account.is_active {
+            return Err(SolLearnError::Activated.into())
+        }
+
+        if ctx.accounts.miner_account.model_index > 0 {
+            return Err(SolLearnError::MustJoinMintingFirst.into())
+        }
+
+        // check is enough token to rejoin mining
+        if ctx.accounts.sol_learn_account.miner_min_stake > ctx.accounts.miner_account.stake_amount {
+            return Err(SolLearnError::MustGreatThanMinStake.into())
+        }
+
+        // update miner join time
+        ctx.accounts.miner_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+        ctx.accounts.miner_account.is_active = true;
+
+        emit!(MinerReJoin {
+            miner: *ctx.accounts.miner.key,
+        });
+
+        Ok(())
+    } 
 
     // pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
     //     msg!("Instruction: Unstake");
