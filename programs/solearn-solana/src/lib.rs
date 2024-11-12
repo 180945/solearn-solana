@@ -156,7 +156,7 @@ pub mod solearn {
             return Err(SolLearnError::Activated.into())
         }
 
-        if ctx.accounts.miner_account.model_index > 0 {
+        if ctx.accounts.miner_account.model_index == 0 {
             return Err(SolLearnError::MustJoinMintingFirst.into())
         }
 
@@ -175,6 +175,78 @@ pub mod solearn {
 
         Ok(())
     } 
+    
+    // topup
+    pub fn topup(ctx: Context<Topup>, topup_amount: u64) -> Result<()> {
+        msg!("Instruction: Top up staking amount");
+
+        // Assuming _updateEpoch() is a function that updates the epoch based on the current clock
+        // _update_epoch(&ctx.accounts.sysvar_clock)?;
+
+        let miner_info = &mut ctx.accounts.miner_info;
+        miner_info.stake_amount += topup_amount;
+
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.miner_staking_wallet.to_account_info(),
+            to: ctx.accounts.vault_staking_wallet.to_account_info(),
+            authority: ctx.accounts.miner.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        token::transfer(cpi_ctx, topup_amount)?;
+        
+        // emit event
+        emit!(MinerTopup {
+            miner: *ctx.accounts.miner.key,
+            amount: topup_amount,
+        });
+
+        Ok(())
+    } 
+
+    // unregister_miner
+    pub fn miner_unregister(ctx: Context<MinerUnRegister>) -> Result<()> {
+        msg!("Instruction: Miner unregister");
+
+        if ctx.accounts.miner_account.model_index != 0 {
+            return Err(SolLearnError::MinerNotRegistered.into())
+        }
+
+        if ctx.accounts.miner_account.unstaking_time != 0 {
+            return Err(SolLearnError::Unstaked.into())
+        }
+
+        // update account unstaking time
+        ctx.accounts.miner_account.unstaking_time = (ctx.accounts.sysvar_clock.unix_timestamp as u64) + ctx.accounts.sol_learn_account.unstake_delay_time;
+        if ctx.accounts.miner_account.is_active {
+            ctx.accounts.miner_account.is_active = false;
+
+            // todo: update epoch reward here
+        }
+
+        // remove from MinersOfModel
+        let miner_key = ctx.accounts.miner.key();
+        let mut data = ctx.accounts.miners_of_model.data.clone();
+        
+        // Find the index of the miner's key in the data
+        if let Some(index) = data.chunks(32).position(|chunk| chunk == miner_key.as_ref()) {
+            // Remove the miner's key from the data
+            data.drain(index * 32..(index + 1) * 32);
+            
+            // Update the account data
+            ctx.accounts.miners_of_model.data = data;
+        } else {
+            return Err(SolLearnError::MinerNotRegistered.into());
+        }
+
+        Ok(())
+    }
+
+    // claim 
+
+    // remove model
+
+
 
     // pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
     //     msg!("Instruction: Unstake");

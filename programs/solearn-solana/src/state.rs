@@ -48,30 +48,24 @@ pub struct AddModel<'info> {
     #[account(
         init, 
         payer = admin, 
-        space = 8 + AddressesOfModel::LEN,
+        space = 8 + MinersOfModel::LEN,
         seeds = [b"models", sol_learn_account.key().as_ref(), model.key().as_ref()], 
         bump
     )]
-    pub addresses_of_model: Account<'info, AddressesOfModel>,
+    pub miners_of_model: Account<'info, MinersOfModel>,
     pub system_program: Program<'info, System>,
 }
 
-#[derive(Accounts)]
-pub struct InitMinerAcc<'info> {
-    #[account(mut)]
-    pub miner: Signer<'info>,
-    #[account(mut)]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
-    #[account(
-        init, 
-        payer = miner, 
-        space = 8 + MinerInfo::LEN,
-        seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
-        bump,
-    )]
-    pub miner_account: Account<'info, MinerInfo>,
-    pub system_program: Program<'info, System>,
-}
+// #[derive(Accounts)]
+// pub struct InitMinerAcc<'info> {
+//     #[account(mut)]
+//     pub miner: Signer<'info>,
+//     #[account(mut)]
+//     pub sol_learn_account: Account<'info, SolLearnInfo>,
+    
+//     pub miner_account: Account<'info, MinerInfo>,
+//     pub system_program: Program<'info, System>,
+// }
 
 #[derive(Accounts)]
 pub struct MinerRegister<'info> {
@@ -86,7 +80,9 @@ pub struct MinerRegister<'info> {
     )]
     pub models: Account<'info, Models>,
     #[account(
-        mut,
+        init, 
+        payer = miner, 
+        space = 8 + MinerInfo::LEN,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
         bump,
     )]
@@ -107,24 +103,56 @@ pub struct MinerRegister<'info> {
     pub sysvar_clock: Sysvar<'info, Clock>,
 }
 
-// #[derive(Accounts)]
-// pub struct Unstake<'info> {
-//     /// CHECK:
-//     #[account(mut)]
-//     pub user: AccountInfo<'info>,
-//     /// CHECK:
-//     #[account(mut)]
-//     pub admin: AccountInfo<'info>,
-//     #[account(mut)]
-//     pub user_info: Account<'info, UserInfo>,
-//     #[account(mut)]
-//     pub user_staking_wallet: InterfaceAccount<'info, TokenAccount>,
-//     #[account(mut)]
-//     pub admin_staking_wallet: InterfaceAccount<'info, TokenAccount>,
-//     #[account(mut)]
-//     pub staking_token: InterfaceAccount<'info, Mint>,
-//     pub token_program: Interface<'info, TokenInterface>,
-// }
+#[derive(Accounts)]
+pub struct Topup<'info> {
+    /// CHECK:
+    #[account(mut)]
+    pub miner: Signer<'info>,
+    /// CHECK:
+    #[account()]
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    #[account(
+        mut,
+        seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
+        bump,
+    )]
+    pub miner_info: Account<'info, MinerInfo>,
+    #[account(mut)]
+    pub miner_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        seeds = [b"vault", sol_learn_account.key().as_ref()], 
+        bump = vault_wallet_owner_pda.bump,
+    )]
+    pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+    #[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner_pda.key())]
+    pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut)]
+    pub staking_token: InterfaceAccount<'info, Mint>,
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
+#[derive(Accounts)]
+pub struct MinerUnRegister<'info> {
+    #[account(mut)]
+    pub miner: Signer<'info>,
+    /// CHECK:
+    #[account()]
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    #[account(
+        mut,
+        seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
+        bump,
+    )]
+    pub miner_account: Account<'info, MinerInfo>,
+    #[account(
+        mut,
+        seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
+        bump
+    )]
+    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub system_program: Program<'info, System>,
+    pub sysvar_clock: Sysvar<'info, Clock>,
+}
 
 #[derive(Accounts)]
 pub struct JoinForMinting<'info> {
@@ -140,13 +168,13 @@ pub struct JoinForMinting<'info> {
     pub miner_account: Account<'info, MinerInfo>,
     #[account(
         mut, 
-        realloc = 8 + 1 + 4 + addresses_of_model.data.len() + 32,
+        realloc = 8 + 1 + 4 + miners_of_model.data.len() + 32,
         realloc::payer = miner,
         realloc::zero = false,
         seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
         bump
     )]
-    pub addresses_of_model: Account<'info, AddressesOfModel>,
+    pub miners_of_model: Account<'info, MinersOfModel>,
     pub models: Account<'info, Models>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
@@ -168,7 +196,7 @@ pub struct ReJoinForMinting<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
         bump
     )]
-    pub addresses_of_model: Account<'info, AddressesOfModel>,
+    pub miners_of_model: Account<'info, MinersOfModel>,
     pub models: Account<'info, Models>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
@@ -202,10 +230,11 @@ pub struct MinerInfo {
     pub last_time: u64,
     pub active_time: u64,
     pub is_active: bool,
+    pub unstaking_time: u64,
 }
 
 impl MinerInfo {
-    pub const LEN: usize = 1 + 32 + 32 + 8 + 8 + 8 + 8 + 1;
+    pub const LEN: usize = 1 + 32 + 32 + 8 + 8 + 8 + 8 + 1 + 8;
 }
 
 #[account]
@@ -228,12 +257,12 @@ impl Models {
 }
 
 #[account]
-pub struct AddressesOfModel {
+pub struct MinersOfModel {
     pub bump: u8, 
     pub data: Vec<u8>,
 }
 
-impl AddressesOfModel {
+impl MinersOfModel {
     pub const LEN: usize = 1 + 4;
 }
 
@@ -246,7 +275,6 @@ pub struct JoingMintingFlag {
     pub last_time: u64,
     pub active_time: u64,
 }
-
 
 
 // EVENTS
@@ -265,4 +293,10 @@ pub struct MinerJoin {
 #[event]
 pub struct MinerReJoin {
     pub miner: Pubkey,
+}
+
+#[event]
+pub struct MinerTopup {
+    pub miner: Pubkey,
+    pub amount: u64,
 }
