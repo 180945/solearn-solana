@@ -2,7 +2,7 @@ pub mod errors;
 pub mod state;
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Transfer};
+use anchor_spl::token::{self, Transfer, TransferChecked, transfer_checked};
 use state::*;
 use errors::*;
 
@@ -67,31 +67,6 @@ pub mod solearn {
         miner_info.model = model;
         ctx.accounts.sol_learn_account.total_miner += 1;
 
-        // this used for unstaking 
-        // let decimals = ctx.accounts.staking_token.decimals;
-        // let solean_key = ctx.accounts.sol_learn_account.key().clone();
-        // let seeds = &[
-        //     &b"vault"[..], solean_key.as_ref()
-        // ];
-
-        // let signer_seeds = &[&seeds[..]];
-
-        // // transfer token to contract
-        // let cpi_accounts = TransferChecked {
-        //     from: ctx.accounts.miner_staking_wallet.to_account_info(),
-        //     to: ctx.accounts.vault_staking_wallet.to_account_info(),
-        //     authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
-        //     mint: ctx.accounts.staking_token.clone().to_account_info()
-        // };
-
-        // let ctx_transfer_token = CpiContext::new_with_signer(
-        //     ctx.accounts.token_program.to_account_info(),
-        //     cpi_accounts,
-        //     signer_seeds
-        // );
-
-        // transfer_checked(ctx_transfer_token, stake_amount, decimals)?;
-
         let cpi_accounts = Transfer {
             from: ctx.accounts.miner_staking_wallet.to_account_info(),
             to: ctx.accounts.vault_staking_wallet.to_account_info(),
@@ -154,58 +129,6 @@ pub mod solearn {
 
         Ok(())
     }
-
-    // this handle case when miner slashed and wanna join mining again
-    pub fn rejoin_mining(ctx: Context<ReJoinForMinting>) -> Result<()> {
-        msg!("Instruction: ReJoin For Minting");
-
-        // Assuming _updateEpoch() is a function that updates the epoch based on the current clock
-        // _update_epoch(&ctx.accounts.sysvar_clock)?;
-
-        if ctx.accounts.miner_account.is_active {
-            return Err(SolLearnError::Activated.into())
-        }
-
-        if ctx.accounts.miner_account.model_index == 0 {
-            return Err(SolLearnError::MustJoinMintingFirst.into())
-        }
-
-        // check is enough token to rejoin mining
-        if ctx.accounts.sol_learn_account.miner_min_stake > ctx.accounts.miner_account.stake_amount {
-            return Err(SolLearnError::MustGreatThanMinStake.into())
-        }
-
-        if ctx.accounts.miner_account.active_time > (ctx.accounts.sysvar_clock.unix_timestamp as u64) {
-            return Err(SolLearnError::NotAcitveYet.into())
-        }
-
-        // update miner join time
-        ctx.accounts.miner_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
-        ctx.accounts.miner_account.is_active = true;
-        if ctx.accounts.miner_account.unstaking_time > 0 {
-            // MustUseCancelUnstakingInstead
-            return Err(SolLearnError::MustUseCancelUnstakingInstead.into())
-        }
-
-        let mut data = ctx.accounts.miners_of_model.data.clone();
-        let miner_key = ctx.accounts.miner.key();
-        // Find the index of the miner's key in the data
-        if let Some(index) = data.chunks(32).position(|chunk| chunk == miner_key.as_ref()) {
-            // Remove the miner's key from the data
-            data.drain(index * 32..(index + 1) * 32);
-            
-            // Update the account data
-            ctx.accounts.miners_of_model.data = data;
-        } else {
-            return Err(SolLearnError::MinerNotActive.into());
-        }
-
-        emit!(MinerReJoin {
-            miner: *ctx.accounts.miner.key,
-        });
-
-        Ok(())
-    } 
     
     // topup
     pub fn topup(ctx: Context<Topup>, topup_amount: u64) -> Result<()> {
@@ -236,7 +159,7 @@ pub mod solearn {
     } 
 
     // unregister_miner
-    pub fn miner_unregister(ctx: Context<MinerUnRegister>) -> Result<()> {
+    pub fn miner_unstaking(ctx: Context<MinerUnStaking>) -> Result<()> {
         msg!("Instruction: Miner unregister");
 
         if ctx.accounts.miner_account.model_index != 0 {
@@ -273,74 +196,63 @@ pub mod solearn {
         Ok(())
     }
 
-
     // claim 
-    pub fn miner_claim(ctx: Context<MinerUnRegister>) -> Result<()> {
+    pub fn miner_claim(ctx: Context<MinerClaim>) -> Result<()> {
         
+        if ctx.accounts.miner_account.is_active {
+            return Err(SolLearnError::Activated.into())
+        }
+
+        if ctx.accounts.miner_account.unstaking_time == 0 || ctx.accounts.miner_account.unstaking_time > (ctx.accounts.sysvar_clock.unix_timestamp as u64) {
+            return Err(SolLearnError::CanNotClaim.into())
+        }
+
+        let unstake_amount = ctx.accounts.miner_account.stake_amount;
+        if unstake_amount == 0 {
+            return Err(SolLearnError::NothingToClaim.into())
+        }
+        ctx.accounts.miner_account.stake_amount = 0;
+        ctx.accounts.miner_account.unstaking_time = 0;
+
+        // this used for unstaking 
+        let decimals = ctx.accounts.staking_token.decimals;
+        let solean_key = ctx.accounts.sol_learn_account.key().clone();
+        let seeds = &[
+            &b"vault"[..], solean_key.as_ref()
+        ];
+
+        let signer_seeds = &[&seeds[..]];
+
+        // transfer token to contract
+        let cpi_accounts = TransferChecked {
+            from: ctx.accounts.miner_staking_wallet.to_account_info(),
+            to: ctx.accounts.vault_staking_wallet.to_account_info(),
+            authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+            mint: ctx.accounts.staking_token.clone().to_account_info()
+        };
+
+        let ctx_transfer_token = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer_seeds
+        );
+
+        transfer_checked(ctx_transfer_token, unstake_amount, decimals)?;
+
 
         Ok(())
     }
 
-
+    // ADMIN section
+    // todos: 
     // remove model
-
-
-
-    // pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
-    //     msg!("Instruction: Unstake");
-
-    //     let user_info = &mut ctx.accounts.user_info;
-    //     let clock = Clock::get()?;
-
-    //     let reward = (clock.slot - user_info.deposit_slot) - user_info.reward_debt;
-
-    //     let cpi_accounts = MintTo {
-    //         mint: ctx.accounts.staking_token.to_account_info(),
-    //         to: ctx.accounts.user_staking_wallet.to_account_info(),
-    //         authority: ctx.accounts.admin.to_account_info(),
-    //     };
-    //     let cpi_program = ctx.accounts.token_program.to_account_info();
-    //     let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-    //     token::mint_to(cpi_ctx, reward)?;
-
-    //     let cpi_accounts = Transfer {
-    //         from: ctx.accounts.admin_staking_wallet.to_account_info(),
-    //         to: ctx.accounts.user_staking_wallet.to_account_info(),
-    //         authority: ctx.accounts.admin.to_account_info(),
-    //     };
-    //     let cpi_program = ctx.accounts.token_program.to_account_info();
-    //     let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-    //     token::transfer(cpi_ctx, user_info.amount)?;
-
-    //     user_info.amount = 0;
-    //     user_info.deposit_slot = 0;
-    //     user_info.reward_debt = 0;
-
-    //     Ok(())
-    // }
-
-    // pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
-    //     msg!("Instruction: Claim Reward");
-
-    //     let user_info = &mut ctx.accounts.user_info;
-    //     let clock = Clock::get()?;
-
-    //     let reward = (clock.slot - user_info.deposit_slot) - user_info.reward_debt;
-
-    //     let cpi_accounts = MintTo {
-    //         mint: ctx.accounts.staking_token.to_account_info(),
-    //         to: ctx.accounts.user_staking_wallet.to_account_info(),
-    //         authority: ctx.accounts.admin.to_account_info(),
-    //     };
-    //     let cpi_program = ctx.accounts.token_program.to_account_info();
-    //     let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-    //     token::mint_to(cpi_ctx, reward)?;
-
-    //     user_info.reward_debt += reward;
-
-    //     Ok(())
-    // }
-
+    // slash miner
+    // claim reward
+    // epoch update
+    // set fine percentage
+    // setPenaltyDuration
+    // setMinFeeToUse
+    // setNewRewardInEpoch
 
 }
 
