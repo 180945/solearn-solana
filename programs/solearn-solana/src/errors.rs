@@ -10,4 +10,8 @@ pub enum SolLearnError {
     MustJoinMintingFirst,
     MinerNotRegistered,
     Unstaked,
+    MinerNotActive,
+    MustUseCancelUnstakingInstead,
+    NeedToWait,
+    UnstakeNotInitYet
 }

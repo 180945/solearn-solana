@@ -130,14 +130,24 @@ pub mod solearn {
             return Err(SolLearnError::Joined.into())
         }
 
+        if ctx.accounts.miner_account.is_active {
+            return Err(SolLearnError::Activated.into())
+        }
+
         // insert model address
-        let addresses_of_model = &mut ctx.accounts.addresses_of_model;
-        addresses_of_model.data.extend_from_slice(ctx.accounts.miner.key().as_ref());
+        let miners_of_model = &mut ctx.accounts.miners_of_model;
+        miners_of_model.data.extend_from_slice(ctx.accounts.miner.key().as_ref());
 
         // update miner join time
         ctx.accounts.miner_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
         ctx.accounts.miner_account.is_active = true;
-        ctx.accounts.miner_account.model_index = (addresses_of_model.data.len() / 32 + 1) as u64;
+        ctx.accounts.miner_account.model_index = (miners_of_model.data.len() / 32 + 1) as u64;
+
+        // handle case miner cancle unstaking
+        if ctx.accounts.miner_account.unstaking_time > 0 {
+            ctx.accounts.miner_account.unstaking_time = 0;
+        }
+
         emit!(MinerJoin {
             miner: *ctx.accounts.miner.key,
         });
@@ -165,9 +175,30 @@ pub mod solearn {
             return Err(SolLearnError::MustGreatThanMinStake.into())
         }
 
+        if ctx.accounts.miner_account.active_time > (ctx.accounts.sysvar_clock.unix_timestamp as u64) {
+            return Err(SolLearnError::NotAcitveYet.into())
+        }
+
         // update miner join time
         ctx.accounts.miner_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
         ctx.accounts.miner_account.is_active = true;
+        if ctx.accounts.miner_account.unstaking_time > 0 {
+            // MustUseCancelUnstakingInstead
+            return Err(SolLearnError::MustUseCancelUnstakingInstead.into())
+        }
+
+        let mut data = ctx.accounts.miners_of_model.data.clone();
+        let miner_key = ctx.accounts.miner.key();
+        // Find the index of the miner's key in the data
+        if let Some(index) = data.chunks(32).position(|chunk| chunk == miner_key.as_ref()) {
+            // Remove the miner's key from the data
+            data.drain(index * 32..(index + 1) * 32);
+            
+            // Update the account data
+            ctx.accounts.miners_of_model.data = data;
+        } else {
+            return Err(SolLearnError::MinerNotActive.into());
+        }
 
         emit!(MinerReJoin {
             miner: *ctx.accounts.miner.key,
@@ -242,7 +273,14 @@ pub mod solearn {
         Ok(())
     }
 
+
     // claim 
+    pub fn miner_claim(ctx: Context<MinerUnRegister>) -> Result<()> {
+        
+
+        Ok(())
+    }
+
 
     // remove model
 
