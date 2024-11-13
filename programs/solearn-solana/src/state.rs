@@ -254,6 +254,7 @@ pub struct MinerInfo {
     pub active_time: u64,
     pub is_active: bool,
     pub unstaking_time: u64,
+    pub reward: u64,
 }
 
 impl MinerInfo {
