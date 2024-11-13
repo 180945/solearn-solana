@@ -35,16 +35,6 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn add_model(ctx: Context<AddModel>, model: Pubkey) -> Result<()> {
-        msg!("Instruction: Add model");
-
-        let models = &mut ctx.accounts.models;
-        models.data.extend_from_slice(model.as_ref());
-        ctx.accounts.sol_learn_account.total_models += 1;
-
-        Ok(())
-    }
-
     pub fn miner_register(ctx: Context<MinerRegister>, stake_amount: u64) -> Result<()> {
         msg!("Instruction: Miner register");
 
@@ -245,7 +235,40 @@ pub mod solearn {
 
     // ADMIN section
     // todos: 
+
+    // add model
+    pub fn add_model(ctx: Context<AddModel>, model: Pubkey) -> Result<()> {
+        msg!("Instruction: Add model");
+
+        let models = &mut ctx.accounts.models;
+        models.data.extend_from_slice(model.as_ref());
+        ctx.accounts.sol_learn_account.total_models += 1;
+
+        Ok(())
+    }
+
     // remove model
+    pub fn remove_model(ctx: Context<RemoveModel>, model: Pubkey) -> Result<()> {
+        msg!("Instruction: Add model");
+
+        let mut data = ctx.accounts.models.data.clone();
+        // Find the index of the miner's key in the data
+        if let Some(index) = data.chunks(32).position(|chunk| chunk == model.as_ref()) {
+            // Remove the miner's key from the data
+            data.drain(index * 32..(index + 1) * 32);
+            
+            // Update the models data
+            ctx.accounts.models.data = data;
+        } else {
+            return Err(SolLearnError::ModelNotExist.into());
+        }
+
+        ctx.accounts.sol_learn_account.total_models -= 1;
+        
+
+        Ok(())
+    }
+
     // slash miner
     // claim reward
     // epoch update

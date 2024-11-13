@@ -57,6 +57,33 @@ pub struct AddModel<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(model: Pubkey)]
+pub struct RemoveModel<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    /// CHECK:
+    #[account(mut, constraint = sol_learn_account.admin == admin.key())]
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    #[account(
+        mut,
+        realloc = 8 + 1 + 4 + models.data.len() + 32,
+        realloc::payer = admin,
+        realloc::zero = false,
+        seeds = [b"models", sol_learn_account.key().as_ref()], 
+        bump = models.bump,
+    )]
+    pub models: Account<'info, Models>,
+    #[account(
+        mut, 
+        close = admin, 
+        seeds = [b"models", sol_learn_account.key().as_ref(), model.key().as_ref()], 
+        bump
+    )]
+    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct MinerRegister<'info> {
     #[account(mut)]
     pub miner: Signer<'info>,

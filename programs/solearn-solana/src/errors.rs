@@ -16,4 +16,5 @@ pub enum SolLearnError {
     UnstakeNotInitYet, 
     CanNotClaim,
     NothingToClaim,
+    ModelNotExist,
 }
