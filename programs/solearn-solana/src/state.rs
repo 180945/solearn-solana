@@ -26,6 +26,7 @@ pub struct Initialize<'info> {
     )]
     pub models: Account<'info, Models>,
     pub system_program: Program<'info, System>,
+    pub sysvar_clock: Sysvar<'info, Clock>,
 }
 
 #[derive(Accounts)]
@@ -102,7 +103,7 @@ pub struct MinerRegister<'info> {
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
         bump,
     )]
-    pub miner_info: Account<'info, MinerInfo>,
+    pub miner_account: Account<'info, MinerInfo>,
     #[account(mut)]
     pub miner_staking_wallet: InterfaceAccount<'info, TokenAccount>,
     #[account(
@@ -171,6 +172,35 @@ pub struct MinerUnStaking<'info> {
 }
 
 #[derive(Accounts)]
+pub struct MinerClaimReward<'info> {
+    #[account(mut)]
+    pub miner: Signer<'info>,
+    /// CHECK:
+    #[account()]
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    #[account(
+        mut,
+        seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
+        bump,
+    )]
+    pub miner_account: Account<'info, MinerInfo>,
+    #[account(mut)]
+    pub miner_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        seeds = [b"vault", sol_learn_account.key().as_ref()], 
+        bump = vault_wallet_owner_pda.bump,
+    )]
+    pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+    #[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner_pda.key())]
+    pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut)]
+    pub staking_token: InterfaceAccount<'info, Mint>,
+    pub system_program: Program<'info, System>,
+    pub sysvar_clock: Sysvar<'info, Clock>,
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
+#[derive(Accounts)]
 pub struct MinerClaim<'info> {
     #[account(mut)]
     pub miner: Signer<'info>,
@@ -235,12 +265,15 @@ pub struct SolLearnInfo {
     pub total_infer: u64,
     pub miner_min_stake: u64,
     pub unstake_delay_time: u64,
-    pub reward_per_slot: u64,
+    pub reward_per_epoch: u64,
     pub mine_fee_to_use: u64,
+    pub last_epoch: u64,
+    pub epoch_duration: u64,
+    pub last_time: u64,
 }
 
 impl SolLearnInfo {
-    pub const LEN: usize = 32 + 32 + 8 + 8 + 8 + 8;
+    pub const LEN: usize = 32 + 32 + 8 * 10;
 }
 
 #[account]
@@ -250,7 +283,7 @@ pub struct MinerInfo {
     pub model: Pubkey,
     pub model_index: u64, // plus one already to make sure > 0
     pub stake_amount: u64,
-    pub last_time: u64,
+    pub last_epoch: u64,
     pub active_time: u64,
     pub is_active: bool,
     pub unstaking_time: u64,

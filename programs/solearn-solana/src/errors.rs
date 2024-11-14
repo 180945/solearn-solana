@@ -17,4 +17,5 @@ pub enum SolLearnError {
     CanNotClaim,
     NothingToClaim,
     ModelNotExist,
+    NoEnoughVault,
 }
