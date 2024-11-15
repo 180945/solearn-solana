@@ -1,12 +1,23 @@
 use anchor_lang::prelude::*;
 
+use crate::SolLearnInfo;
+
 #[derive(Accounts)]
 pub struct UpdateParamsVld<'info> {
-    #[account(init, payer = user, space = 8 + 8)]
+    #[account(mut)]
     pub wh_account: Account<'info, WorkerHubStorage>,
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub admin: Signer<'info>,
+    /// CHECK:
+    #[account(mut, constraint = sol_learn_account.admin == admin.key())]
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ReadStateVld<'info> {
+    #[account(mut)]
+    pub wh_account: Account<'info, WorkerHubStorage>,
 }
 
 #[account]
@@ -58,11 +69,12 @@ pub struct Inference {
 }
 
 #[derive(Accounts)]
+#[instruction(inference_id: u64)]
 pub struct InferVld<'info> {
     #[account(
         init,
         payer = signer,
-        space = 8 + 2 + 4 + 2000 + 1, seeds = [b"inference", signer.key().as_ref()], bump
+        space = 8 + 2 + 4 + 2000 + 1, seeds = [b"inference", inference_id.to_le_bytes().as_ref()], bump
     )]
     pub infs: Account<'info, Inference>,
     pub system_program: Program<'info, System>,
@@ -80,9 +92,10 @@ pub struct InferVld<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(inference_id: u64)]
 pub struct UpdateInferVld<'info> {
     pub system_program: Program<'info, System>,
-    #[account(mut, seeds = [b"inference", signer.key().as_ref()], bump = infs.bump)]
+    #[account(mut)]
     pub infs: Account<'info, Inference>,
     pub signer: Signer<'info>,
     /// CHECK:
@@ -97,8 +110,42 @@ pub struct VotingInfo {
 }
 pub struct Bytes32 {}
 pub type Bytes32Set = Vec<Bytes32>;
-pub struct Boost {}
-pub struct DAOTokenReceiverInfo {}
+
+#[account]
+pub struct Boost {
+    pub miner_timestamp: u64,
+    pub validator_timestamp: u64,
+    pub reserved1: u64,
+    pub reserved2: u64,
+}
+
+pub enum DAOTokenReceiverRole {
+    Miner,
+    Validator,
+    User,
+    Referrer,
+    Referee,
+    L2Owner,
+}
+
+#[account]
+pub struct DAOTokenReceiverInfo {
+    pub receiver: Pubkey,
+    pub amount: u64,
+    pub role: u8,
+}
+
+#[account]
+pub struct DAOTokenReceiverInfos {
+    pub values: Vec<DAOTokenReceiverInfo>,
+    pub bump: u8,
+}
+
+pub enum Vote {
+    Nil,
+    Disapproval,
+    Approval,
+}
 
 #[account]
 pub struct Worker {
@@ -140,6 +187,15 @@ pub struct Hashes {
     pub values: Vec<[u8; 32]>,
 }
 
+#[account]
+pub struct DAOTokenPercentage {
+    pub miner_percentage: u16,
+    pub user_percentage: u16,
+    pub referrer_percentage: u16,
+    pub referee_percentage: u16,
+    pub l2_owner_percentage: u16,
+}
+
 #[derive(Accounts)]
 pub struct UpdateEpochVld<'info> {
     pub system_program: Program<'info, System>,
@@ -155,6 +211,7 @@ pub struct UpdateEpochVld<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(assignment_id: u64)]
 pub struct UpdateAssignmentVld<'info> {
     #[account(mut)]
     pub wh_account: Account<'info, WorkerHubStorage>,
@@ -172,6 +229,8 @@ pub struct UpdateAssignmentVld<'info> {
     pub voting_info: Account<'info, VotingInfo>,
     #[account(mut)]
     pub digests: Account<'info, Hashes>,
+    #[account(mut, seeds = [b"dao_receivers_info", signer.key().as_ref()], bump = dao_receiver_infos.bump)]
+    pub dao_receiver_infos: Account<'info, DAOTokenReceiverInfos>,
     pub signer: Signer<'info>,
 }
 
@@ -186,51 +245,63 @@ pub struct UpdateMinerAddressesByModelVld<'info> {
 
 #[account]
 pub struct WorkerHubStorage {
-    // pub randomizer: Pubkey,
     pub models: Vec<Model>,
+    pub miner_addresses: Pubkeys,
+    pub inference_number: u64,
+    pub assignment_number: u64,
+    pub miner_minimum_stake: u64,
+    pub l2_owner: Pubkey,
+    pub treasury: Pubkey,
+    pub fee_l2_percentage: u16,
+    pub fee_treasury_percentage: u16,
+    pub fee_ratio_miner_validator: u16,
+    pub submit_duration: u64,
+    pub commit_duration: u64,
+    pub reveal_duration: u64,
+    pub penalty_duration: u64,
+    pub miner_requirement: u8,
+    pub blocks_per_epoch: u64,
+    pub last_block: u64,
+    pub current_epoch: u64,
+    pub reward_per_epoch: u64,
+    pub fine_percentage: u16,
+    pub dao_token: Pubkey,
+    pub dao_token_reward: u64,
+    pub dao_token_percentage: DAOTokenPercentage,
+    pub min_fee_to_use: u64,
+    // pub randomizer: Pubkey,
     // pub miners: HashMap<Pubkey, Worker>,
     // pub minerAddressesByModel: HashMap<Pubkey, Pubkeys>,
     // pub modelAddresses: Pubkeys,
-    pub miner_addresses: Pubkeys,
     // pub minerUnstakeRequests: HashMap<Pubkey, UnstakeRequest>,
-    pub inference_number: u64,
     // pub inferences: HashMap<u64, Inference>,
-    pub assignment_number: u64,
     // pub assignments: HashMap<u64, Assignment>,
     // pub votingInfo: HashMap<u64, VotingInfo>,
     // pub digests: HashMap<u64, Bytes32Set>,
     // pub countDigest: HashMap<Bytes32, u8>,
     // pub assignmentsByMiner: HashMap<Pubkey, Vec<u64>>,
     // pub assignmentsByInference: HashMap<u64, Vec<u64>>,
-    pub miner_minimum_stake: u64,
-    // pub l2Owner: Pubkey,
-    // pub treasury: Pubkey,
-    pub fee_l2_percentage: u16,
-    pub fee_treasury_percentage: u16,
-    // pub feeRatioMinerValidator: u16,
-    pub submit_duration: u64,
-    pub commit_duration: u64,
-    pub reveal_duration: u64,
-    pub penalty_duration: u64,
     // pub unstakeDelayTime: u64,
-    pub miner_requirement: u8,
     // pub maximumTier: u16,
-    pub blocks_per_epoch: u64,
-    pub last_block: u64,
-    pub current_epoch: u64,
-    pub reward_per_epoch: u64,
     // pub rewardPerEpoch: u64,
-    pub fine_percentage: u16,
     // pub minerRewards: HashMap<Pubkey, u64>,
     // pub boost: HashMap<Pubkey, Boost>,
     // pub isReferrer: HashMap<Pubkey, bool>,
-    // pub daoToken: Pubkey,
-    // pub daoTokenReward: u64,
-    // pub daoTokenPercentage: Pubkey,
     // pub referrerOf: HashMap<Pubkey, Pubkey>,
-    // pub minFeeToUse: u64,
     // pub workerHubScoring: Pubkey,
     // pub modelScoring: Pubkey,
     // pub daoReceiversInfo: HashMap<u64, Vec<DAOTokenReceiverInfo>>,
     // pub wEAI: Pubkey,
 }
+
+#[account]
+pub struct Task {
+	pub fn_type: u8,
+	pub data: Vec<u8>,
+}
+
+#[account]
+pub struct Tasks {
+	pub values: Vec<Task>,
+}
+

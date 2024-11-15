@@ -289,11 +289,17 @@ pub mod solearn {
         Ok(())
     }
 
+    pub fn next_inference_id(ctx: Context<ReadStateVld>) -> Result<u64> {
+        let acc = &ctx.accounts.wh_account;
+        Ok(acc.inference_number)
+    }
+
     pub fn infer(
         ctx: Context<InferVld>,
         input: Vec<u8>,
         creator: Pubkey,
         _value: u64,
+        inference_id: u64,
     ) -> Result<u64> {
         let acc = &mut ctx.accounts.wh_account;
         let models_map = get_models_as_map(&acc.models);
@@ -302,7 +308,7 @@ pub mod solearn {
             return Err(SolLearnError::Unauthorized.into());
         }
 
-        let scoring_fee = validate_enough_fee_to_use(model.minimum_fee, _value)?; // TODO
+        let scoring_fee = validate_enough_fee_to_use(model.minimum_fee, _value)?;
 
         if ctx.accounts.recipient.key() != *ctx.program_id {
             return Err(SolLearnError::WrongRecipient.into());
@@ -320,7 +326,9 @@ pub mod solearn {
         let value = _value - scoring_fee;
 
         acc.inference_number += 1;
-        let inference_id = acc.inference_number;
+        if inference_id != acc.inference_number {
+            return Err(SolLearnError::WrongInferenceId.into());
+        }
         let inference = &mut ctx.accounts.infs;
 
         let fee_l2 = (value * u64::from(acc.fee_l2_percentage)) / PERCENTAGE_DENOMINATOR;
@@ -337,9 +345,6 @@ pub mod solearn {
         inference.model_address = ctx.accounts.signer.key();
         inference.bump = ctx.bumps.infs;
 
-        // emit NewInference(inference_id, msg.sender, creator, value, 0);
-
-        // assign_miners(inference_id, acc, inference)?;
         let slot_number = Clock::get()?.slot;
         let expired_at = slot_number + acc.submit_duration;
         let commit_timeout = expired_at + acc.commit_duration;
@@ -354,13 +359,11 @@ pub mod solearn {
         let mut selected_miners = Vec::with_capacity(n as usize);
 
         for i in 0..n {
-            // randomizer.random_uint256()
             let rand_uint = random_number(&&Clock::get()?, i.into(), miner_addresses.values.len() as u64);
             
             let miner_ind = (rand_uint as usize) % miner_addresses.values.len();
             let miner = miner_addresses.values[miner_ind];
             let assignment = &mut ctx.accounts.assignment;
-            // miner_addresses.erase(miner);
             miner_addresses.values.remove(miner_ind);
             let assignment_id = acc.assignment_number;
             acc.assignment_number += 1;
@@ -371,7 +374,7 @@ pub mod solearn {
             selected_miners.push(miner);
             // assignments_by_miner[miner].insert(assignment_id);
             // assignments_by_inference[inference_id].insert(assignment_id);
-            // emit NewAssignment(assignment_id, inference_id, miner, expired_at);
+
         }
 
         for miner in selected_miners {
@@ -382,7 +385,7 @@ pub mod solearn {
         Ok(0)
     }
 
-    pub fn top_up_infer(ctx: Context<UpdateInferVld>, value: u64) -> Result<()> {
+    pub fn top_up_infer(ctx: Context<UpdateInferVld>, inference_id: u64, value: u64) -> Result<()> {
         if value == 0 {
             return Err(SolLearnError::ZeroValue.into());
         }
@@ -402,6 +405,9 @@ pub mod solearn {
         )?;
 
         let inference = &mut ctx.accounts.infs;
+        if inference_id != inference.id {
+            return Err(SolLearnError::WrongInferenceId.into());
+        }
         if inference.status != 1 {
             return Err(SolLearnError::InferMustBeSolvingState.into());
         }
@@ -416,6 +422,10 @@ pub mod solearn {
         let inference = &mut ctx.accounts.infs;
         let assignment = &mut ctx.accounts.assignment;
         let miner_epoch_state = &mut ctx.accounts.miner_reward;
+
+        if assignment_id != assignment.id {
+            return Err(SolLearnError::Unauthorized.into());
+        }
 
         update_epoch(acc, miner_epoch_state)?;
 
@@ -447,6 +457,9 @@ pub mod solearn {
 
         let infer_id = assignment.inference_id;
 
+        if assignment_id != assignment.id {
+            return Err(SolLearnError::Unauthorized.into());
+        }
         if inference.id != infer_id {
             return Err(SolLearnError::Unauthorized.into());
         }
@@ -474,7 +487,7 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn commit(ctx: Context<UpdateAssignmentVld>, commitment: [u8; 32]) -> Result<()> {
+    pub fn commit(ctx: Context<UpdateAssignmentVld>, assignment_id: u64, commitment: [u8; 32]) -> Result<()> {
         let acc = &mut ctx.accounts.wh_account;
         let miner_epoch_state = &mut ctx.accounts.miner_reward;
         update_epoch(acc, miner_epoch_state)?;
@@ -484,6 +497,9 @@ pub mod solearn {
 
         let infer_id = assignment.inference_id;
 
+        if assignment_id != assignment.id {
+            return Err(SolLearnError::Unauthorized.into());
+        }
         if inference.id != infer_id {
             return Err(SolLearnError::Unauthorized.into());
         }
@@ -517,7 +533,7 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn reveal(ctx: Context<UpdateAssignmentVld>, nonce: u64, data: Vec<u8>) -> Result<()> {
+    pub fn reveal(ctx: Context<UpdateAssignmentVld>, assignment_id: u64, nonce: u64, data: Vec<u8>) -> Result<()> {
         let acc = &mut ctx.accounts.wh_account;
         let miner_epoch_state = &mut ctx.accounts.miner_reward;
         update_epoch(acc, miner_epoch_state)?;
@@ -526,7 +542,9 @@ pub mod solearn {
         let voting_info = &mut ctx.accounts.voting_info;
 
         let infer_id = assignment.inference_id;
-
+        if assignment_id != assignment.id {
+            return Err(SolLearnError::Unauthorized.into());
+        }
         if inference.id != infer_id {
             return Err(SolLearnError::Unauthorized.into());
         }
@@ -569,24 +587,30 @@ pub mod solearn {
         }
 
         if voting_info.total_reveal as usize == inference.assignments.len() - 1 {
-            resolve_inference(ctx)?;
+            resolve_inference(ctx, assignment_id)?;
         }
 
         Ok(())
     }
 
-    pub fn resolve_inference(ctx: Context<UpdateAssignmentVld>) -> Result<()> {
+    pub fn resolve_inference(ctx: Context<UpdateAssignmentVld>, assignment_id: u64) -> Result<()> {
         let acc = &mut ctx.accounts.wh_account;
-        let miner_epoch_state = &mut ctx.accounts.miner_reward;
-        update_epoch(acc, miner_epoch_state)?;
         let inference = &mut ctx.accounts.infs;
+        let assignment = &mut ctx.accounts.assignment;
+        let dao_receivers = &mut ctx.accounts.dao_receiver_infos;
+        let digests = &mut ctx.accounts.digests;
+        let miner_epoch_state = &mut ctx.accounts.miner_reward;
         let voting_info = &mut ctx.accounts.voting_info;
-        // let digests = &mut ctx.accounts.digests;
+
+        if assignment_id != assignment.id {
+            return Err(SolLearnError::Unauthorized.into());
+        }
+        update_epoch(acc, miner_epoch_state)?;
 
         let infer_id = inference.id;
 
-        if inference.status == 1 && Clock::get()?.slot > inference.submit_timeout {
-            if inference.processed_miner != Pubkey::default() {
+        if inference.status == 1 {
+            if Clock::get()?.slot > inference.submit_timeout && inference.processed_miner != Pubkey::default() {
                 inference.status = 5;
                 // system_program::transfer(
                 //     CpiContext::new(
@@ -598,42 +622,52 @@ pub mod solearn {
                 //     ),
                 //     inference.value + inference.fee_l2 + inference.fee_treasury,
                 // )?;
+                // TODO
                 // _slash_miner(inference.processedMiner, true);
             }
-        }
-
-        if inference.status == 2 && Clock::get()?.slot > inference.commit_timeout {
-            if voting_info.total_commit + 1 >= inference.assignments.len() as u8 {
-                inference.status = 3;
-            } else {
-                inference.status = 4;
-                // system_program::transfer(
-                //     CpiContext::new(
-                //         ctx.accounts.system_program.to_account_info(),
-                //         system_program::Transfer {
-                //             from: ctx.accounts.recipient.to_account_info(),
-                //             to: ctx.accounts.infs.creator.to_account_info(),
-                //         },
-                //     ),
-                //     inference.value + inference.fee_l2 + inference.fee_treasury,
-                // )?;
-                for assignment_id in &inference.assignments {
-                    let assignment = &ctx.accounts.assignment;
-                    if assignment.commitment == [0; 32] {
-                        // _slash_miner(assignment.worker, false);
+        } else if inference.status == 2 {
+            if Clock::get()?.slot > inference.commit_timeout {
+                if voting_info.total_commit + 1 >= inference.assignments.len() as u8 {
+                    inference.status = 3;
+                } else {
+                    inference.status = 4;
+                    // system_program::transfer(
+                    //     CpiContext::new(
+                    //         ctx.accounts.system_program.to_account_info(),
+                    //         system_program::Transfer {
+                    //             from: ctx.accounts.recipient.to_account_info(),
+                    //             to: ctx.accounts.infs.creator.to_account_info(),
+                    //         },
+                    //     ),
+                    //     inference.value + inference.fee_l2 + inference.fee_treasury,
+                    // )?;
+                    for assignment_id in &inference.assignments {
+                        let assignment = &ctx.accounts.assignment;
+                        if assignment.commitment == [0; 32] {
+                            // _slash_miner(assignment.worker, false);
+                        }
                     }
                 }
             }
-        }
-
-        if inference.status == 3 {
+        } else if inference.status == 3 {
             if Clock::get()?.slot > inference.reveal_timeout
                 || voting_info.total_reveal == voting_info.total_commit
             {
-                // if !filter_commitment(ctx.accounts.infs.id, digests) {
-                //     handle_not_enough_vote(ctx.accounts.infs.id);
-                //     inference.status = 4;
-                // }
+                if !filter_commitment(acc, inference, assignment, dao_receivers, digests)? {
+                    //     handle_not_enough_vote(ctx.accounts.infs.id);
+                    // TransferHelper.safeTransferNative(
+                    //     inference.creator,
+                    //     inference.value + inference.fee_l2 + inference.fee_treasury
+                    // );
+
+                    for assignment_id in &inference.assignments {
+                        let assignment = &ctx.accounts.assignment;
+                        if assignment.digest == [0; 32] {
+                            // _slash_miner(ctx, ctx.accounts.assignments[assignment_id].worker, false)?;
+                        }
+                    }
+                    inference.status = 4;
+                }
             }
         }
 
@@ -661,30 +695,86 @@ pub mod solearn {
         Ok(())
     }
 
-}
+    pub fn calculate_user_dao_token_received(ctx: Context<UpdateEpochVld>, score: u8) -> Result<u64> {
+        let acc = &ctx.accounts.wh_account;
+        let mut user_dao_token_receive = 0;
 
-fn random_number(clk: &Clock, nonce: u64, range: u64) -> u64 {
-    if range == 0 {
-        return 0;
+        if score >= 1 && score <= 10 {
+            user_dao_token_receive = (((acc.dao_token_percentage.user_percentage as u64) * ((score as u64) * (acc.dao_token_reward as u64))) / 10) / PERCENTAGE_DENOMINATOR;
+        }
+
+        Ok(user_dao_token_receive.into())
     }
-    // tbd: get recent blockhash
-    // let data = recent_slothashes.data.borrow();
-    // let most_recent = array_ref![data, 12, 8];
-    let mut cloned_data: Vec<u8> = vec![];
-    let nonce_bytes = nonce.to_le_bytes();
-    cloned_data.extend_from_slice(&nonce_bytes);
-    let time_bytes = (clk.unix_timestamp as u64) as u64;
-    cloned_data.extend_from_slice(&time_bytes.to_le_bytes());
-    hash(&cloned_data);
-    let rightmost: &[u8] = &cloned_data[28..];
-    
-    let seed = u64::try_from_slice(rightmost).unwrap();
-    
-    seed % range
 
-    
-    // let leader_schedule_epoch = clk.leader_schedule_epoch;
-    // let most_recent = array_ref![recent_blockhash_data, 0, 16];
-    // u128::from_le_bytes(*most_recent)
-    // leader_schedule_epoch % range
+    pub fn set_fine_percentage(ctx: Context<UpdateParamsVld>, fine_percentage: u16) -> Result<()> {
+        let acc = &mut ctx.accounts.wh_account;
+        only_updated_epoch(acc)?;
+
+        acc.fine_percentage = fine_percentage;
+
+        Ok(())
+    }
+
+    pub fn set_penalty_duration(ctx: Context<UpdateParamsVld>, penalty_duration: u64) -> Result<()> {
+        let acc = &mut ctx.accounts.wh_account;
+        only_updated_epoch(acc)?;
+
+        acc.penalty_duration = penalty_duration;
+
+        Ok(())
+    }
+
+    pub fn set_min_fee_to_use(ctx: Context<UpdateParamsVld>, min_fee_to_use: u64) -> Result<()> {
+        let acc = &mut ctx.accounts.wh_account;
+        only_updated_epoch(acc)?;
+
+        acc.min_fee_to_use = min_fee_to_use;
+
+        Ok(())
+    }
+
+    pub fn set_l2_owner(ctx: Context<UpdateParamsVld>, l2_owner_address: Pubkey) -> Result<()> {
+        let acc = &mut ctx.accounts.wh_account;
+        only_updated_epoch(acc)?;
+
+        acc.l2_owner = l2_owner_address;
+
+        Ok(())
+    }
+
+    pub fn set_dao_token(ctx: Context<UpdateParamsVld>, dao_token_address: Pubkey) -> Result<()> {
+        let acc = &mut ctx.accounts.wh_account;
+        only_updated_epoch(acc)?;
+
+        acc.dao_token = dao_token_address;
+
+        Ok(())
+    }
+
+    pub fn set_treasury_address(ctx: Context<UpdateParamsVld>, treasury_address: Pubkey) -> Result<()> {
+        let acc = &mut ctx.accounts.wh_account;
+        only_updated_epoch(acc)?;
+
+        acc.treasury = treasury_address;
+
+        Ok(())
+    }
+
+    pub fn set_fee_ratio_miner_validator(ctx: Context<UpdateParamsVld>, new_ratio: u16) -> Result<()> {
+        let acc = &mut ctx.accounts.wh_account;
+        only_updated_epoch(acc)?;
+
+        acc.fee_ratio_miner_validator = new_ratio;
+
+        Ok(())
+    }
+
+    pub fn set_dao_token_reward(ctx: Context<UpdateParamsVld>, new_dao_token_reward: u64) -> Result<()> {
+        let acc = &mut ctx.accounts.wh_account;
+        only_updated_epoch(acc)?;
+
+        acc.dao_token_reward = new_dao_token_reward;
+
+        Ok(())
+    }
 }

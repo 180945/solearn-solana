@@ -31,4 +31,6 @@ pub enum SolLearnError {
     InferenceSeized,
     #[msg("Invalid reveal")]
     InvalidReveal,
+    #[msg("Wrong inference id")]
+    WrongInferenceId,
 }
