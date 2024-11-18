@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-use crate::{SolLearnInfo, VaultAccount};
+use crate::{MinerInfo, SolLearnInfo, VaultAccount};
 
 #[derive(Accounts)]
 pub struct UpdateParamsVld<'info> {
@@ -148,17 +148,17 @@ pub enum Vote {
     Approval,
 }
 
-#[account]
-pub struct Worker {
-    pub stake: u64,
-    pub commitment: [u8; 32],
-    pub address: Pubkey,
-    pub model_address: Pubkey,
-    pub last_claimed_epoch: u64,
-    pub active_time: u64,
-    pub tier: u16,
-    pub bump: u8,
-}
+// #[account]
+// pub struct MinerInfo {
+//     pub stake: u64,
+//     pub commitment: [u8; 32],
+//     pub address: Pubkey,
+//     pub model_address: Pubkey,
+//     pub last_claimed_epoch: u64,
+//     pub active_time: u64,
+//     pub tier: u16,
+//     pub bump: u8,
+// }
 
 #[account]
 pub struct Assignment {
@@ -222,7 +222,7 @@ pub struct SlashMinerByAdminVld<'info> {
     #[account(mut)]
     pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
-    pub miner: Account<'info, Worker>,
+    pub miner: Account<'info, MinerInfo>,
     /// CHECK:
     #[account(mut, constraint = sol_learn_account.admin == signer.key())]
     pub sol_learn_account: Account<'info, SolLearnInfo>,
@@ -262,7 +262,7 @@ pub struct SlashMinerVld<'info> {
 	#[account(mut)]
 	pub miner_addresses: Account<'info, Pubkeys>,
 	#[account(mut)]
-	pub miner: Account<'info, Worker>,
+	pub miner: Account<'info, MinerInfo>,
 	#[account(mut)]
 	pub tasks: Account<'info, Tasks>,
 	#[account(mut)]
@@ -298,7 +298,7 @@ pub struct UpdateAssignmentVld<'info> {
     // #[account(mut)]
     // pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
-    pub miner: Account<'info, Worker>,
+    pub miner: Account<'info, MinerInfo>,
     #[account(mut)]
     pub voting_info: Account<'info, VotingInfo>,
     #[account(mut)]

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::errors::*;
 use crate::state_inf::*;
+use crate::MinerInfo;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak::hash;
 
@@ -51,19 +52,19 @@ pub fn only_empty_tasks(t: &mut Tasks) -> Result<()> {
 }
 
 pub fn _slash_miner(
-    miner: &mut Worker,
+    miner: &mut MinerInfo,
     is_fined: bool,
     acc: &mut WorkerHubStorage,
     miner_addresses: &mut Pubkeys,
 ) -> Result<u64> {
-    if !acc.miner_addresses.values.contains(&miner.address) {
+    if !acc.miner_addresses.values.contains(&miner.miner) {
         return Err(SolLearnError::Unauthorized.into());
     }
 
     // _claim_reward(miner, false);
     let mut remove_ind = 0;
     for (i, m) in miner_addresses.values.iter().enumerate() {
-        if *m == miner.address {
+        if *m == miner.miner {
             remove_ind = i;
             break;
         }
@@ -73,10 +74,10 @@ pub fn _slash_miner(
 
     if is_fined {
         let fine = (acc.miner_minimum_stake * acc.fine_percentage as u64) / PERCENTAGE_DENOMINATOR;
-        if miner.stake < fine {
-            miner.stake = 0;
+        if miner.stake_amount < fine {
+            miner.stake_amount = 0;
         } else {
-            miner.stake -= fine;
+            miner.stake_amount -= fine;
         }
 
         Ok(fine)

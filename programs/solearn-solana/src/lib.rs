@@ -871,7 +871,7 @@ pub mod solearn {
 
         let miner_addresses = &mut ctx.accounts.miner_addresses;
         let miner = &mut ctx.accounts.miner;
-        if miner.address != _miner {
+        if miner.miner != _miner {
             return Err(SolLearnError::Unauthorized.into());
         }
 
@@ -902,7 +902,7 @@ pub mod solearn {
             pubkey_bytes.copy_from_slice(&data[1..33]);
             let pubkey = Pubkey::new_from_array(pubkey_bytes);
             let is_fined = data[33] == 1;
-            if pubkey != miner.address {
+            if pubkey != miner.miner {
                 return Err(SolLearnError::Unauthorized.into());
             }
 
@@ -925,7 +925,7 @@ pub mod solearn {
                 assignment.vote = set_vote;
             }
             let pubkey = assignment.worker;
-            if pubkey != miner.address {
+            if pubkey != miner.miner {
                 return Err(SolLearnError::Unauthorized.into());
             }
             _slash_miner(miner, is_fined, acc, miner_addresses)?
