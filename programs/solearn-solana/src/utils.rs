@@ -16,23 +16,23 @@ pub fn validate_enough_fee_to_use(minimum_fee: u64, value: u64) -> Result<u64> {
     Ok(minimum_fee)
 }
 
-pub fn update_epoch(es: &mut WorkerHubStorage, ms: &mut MinerEpochState) -> Result<()> {
-    let slot_number = Clock::get()?.slot;
-    let epoch_passed = (slot_number - es.last_block) / es.blocks_per_epoch;
-    if epoch_passed > 0 {
-        es.last_block += es.blocks_per_epoch * epoch_passed;
-        let reward_in_current_epoch = (es.reward_per_epoch * es.blocks_per_epoch) / BLOCK_PER_YEAR;
+// pub fn update_epoch(es: &mut WorkerHubStorage, ms: &mut MinerEpochState) -> Result<()> {
+//     let slot_number = Clock::get()?.slot;
+//     let epoch_passed = (slot_number - es.last_block) / es.blocks_per_epoch;
+//     if epoch_passed > 0 {
+//         es.last_block += es.blocks_per_epoch * epoch_passed;
+//         let reward_in_current_epoch = (es.reward_per_epoch * es.blocks_per_epoch) / BLOCK_PER_YEAR;
 
-        for _ in 0..epoch_passed {
-            ms.total_miner = es.miner_addresses.values.len() as u64;
-            ms.epoch_reward = reward_in_current_epoch;
-            es.current_epoch += 1;
-        }
-    } else {
-        es.last_block = slot_number;
-    }
-    Ok(())
-}
+//         for _ in 0..epoch_passed {
+//             ms.total_miner = es.miner_addresses.values.len() as u64;
+//             ms.epoch_reward = reward_in_current_epoch;
+//             es.current_epoch += 1;
+//         }
+//     } else {
+//         es.last_block = slot_number;
+//     }
+//     Ok(())
+// }
 
 pub fn only_updated_epoch(es: &mut WorkerHubStorage) -> Result<()> {
     let slot_number = Clock::get()?.slot;
@@ -43,12 +43,19 @@ pub fn only_updated_epoch(es: &mut WorkerHubStorage) -> Result<()> {
     Ok(())
 }
 
+pub fn only_empty_tasks(t: &mut Tasks) -> Result<()> {
+    if t.values.len() > 0 {
+        return Err(SolLearnError::MustWaitTasks.into());
+    }
+    Ok(())
+}
+
 pub fn _slash_miner(
     miner: &mut Worker,
     is_fined: bool,
     acc: &mut WorkerHubStorage,
     miner_addresses: &mut Pubkeys,
-) -> Result<()> {
+) -> Result<u64> {
     if !acc.miner_addresses.values.contains(&miner.address) {
         return Err(SolLearnError::Unauthorized.into());
     }
@@ -72,7 +79,8 @@ pub fn _slash_miner(
             miner.stake -= fine;
         }
 
-        // TODO
+        Ok(fine)
+
         // boost[_miner].reserved1 = 0;
         // system_program::transfer(
         //     CpiContext::new(
@@ -84,9 +92,9 @@ pub fn _slash_miner(
         //     ),
         //     inference.value + inference.fee_l2 + inference.fee_treasury,
         // )?;
+    } else {
+        Ok(0)
     }
-
-    Ok(())
 }
 
 pub fn calculate_transferred_dao_token(
@@ -138,12 +146,18 @@ pub fn calculate_transferred_dao_token(
     Ok(())
 }
 
-pub fn filter_commitment(acc: &mut WorkerHubStorage, inference: &mut Inference, assignment: &mut Assignment, dao_receivers: &mut DAOTokenReceiverInfos, digests: &mut Hashes) -> Result<bool> {
+pub fn filter_commitment(
+    acc: &mut WorkerHubStorage,
+    inference: &mut Inference,
+    assignment: &mut Assignment,
+    dao_receivers: &mut DAOTokenReceiverInfos,
+    tasks: &mut Tasks,
+) -> Result<bool> {
     // let acc = &mut ctx.accounts.wh_account;
     // let inference = &mut ctx.accounts.infs;
     // let assignment = &ctx.accounts.assignment;
     // let dao_receivers = &mut ctx.accounts.dao_receiver_infos;
-    // let digests = &mut ctx.accounts.digests;
+    let digests = &inference.digests;
 
     let (most_voted_digest, max_count) = find_most_voted_digest(digests.values.clone())?;
     if (max_count as u64) < get_threshold_value(inference.assignments.len() as u64) {
@@ -160,7 +174,8 @@ pub fn filter_commitment(acc: &mut WorkerHubStorage, inference: &mut Inference, 
     let remain_value = inference.value;
     let mut token_for_miner = 0;
     let mut share_token_per_validator = 0;
-    let remain_token = ((acc.dao_token_percentage.miner_percentage as u64) * acc.dao_token_reward) / PERCENTAGE_DENOMINATOR;
+    let remain_token = ((acc.dao_token_percentage.miner_percentage as u64) * acc.dao_token_reward)
+        / PERCENTAGE_DENOMINATOR;
 
     if not_reached_limit && remain_token > 0 {
         calculate_transferred_dao_token(acc, inference, dao_receivers, is_referred)?;
@@ -168,15 +183,11 @@ pub fn filter_commitment(acc: &mut WorkerHubStorage, inference: &mut Inference, 
 
     if is_match_miner_result {
         fee_for_miner =
-            (remain_value * acc.fee_ratio_miner_validator as u64) /
-            PERCENTAGE_DENOMINATOR;
+            (remain_value * acc.fee_ratio_miner_validator as u64) / PERCENTAGE_DENOMINATOR;
         share_fee_per_validator = (remain_value - fee_for_miner) / (max_count - 1);
         token_for_miner =
-            (remain_token * acc.fee_ratio_miner_validator as u64) /
-            PERCENTAGE_DENOMINATOR;
-        share_token_per_validator =
-            (remain_token - token_for_miner) /
-            (max_count - 1);
+            (remain_token * acc.fee_ratio_miner_validator as u64) / PERCENTAGE_DENOMINATOR;
+        share_token_per_validator = (remain_token - token_for_miner) / (max_count - 1);
     } else {
         share_fee_per_validator = remain_value / max_count;
         share_token_per_validator = remain_token / max_count;
@@ -184,29 +195,37 @@ pub fn filter_commitment(acc: &mut WorkerHubStorage, inference: &mut Inference, 
 
     for i in 0..inference.assignments.len() {
         // let assignment = &assignment[assignment_ids[i]];
-        if assignment.digest != most_voted_digest {
-            assignment.vote = 1; // Vote::Disapproval
+        if inference.digests.values[i] != most_voted_digest {
+            // assignment.vote = 1; // Vote::Disapproval
             // slash_miner(ctx, assignment.worker, true)?;
+            let mut data = vec![];
+            data.push(0);
+            data.extend_from_slice(&inference.assignments[i].to_le_bytes());
+            data.push(0);
+            data.push(0);
+            data.push(1);
+            tasks.values.push(Task { fn_type: 2, data });
         } else {
-            assignment.vote = 2; // Vote::Approval
-            if assignment.role == 1 { // AssignmentRole::Validating
+            // assignment.vote = 2; // Vote::Approval
+            if assignment.role == 1 {
+                // AssignmentRole::Validating
                 if share_fee_per_validator > 0 {
-                    // TransferHelper.safeTransferNative(
-                    //     assignment.worker,
-                    //     share_fee_per_validator
-                    // );
-                    // TransferHelper.safeTransfer(
-                    //     wEAI,
-                    //     assignment.worker,
-                    //     share_fee_per_validator
-                    // );
+                    let mut data = vec![];
+                    data.push(1);
+                    data.extend_from_slice(&assignment.id.to_le_bytes());
+                    data.extend_from_slice(&share_fee_per_validator.to_le_bytes());
+                    data.push(2);
+                    tasks.values.push(Task { data, fn_type: 1 });
                 }
                 if not_reached_limit && token_for_miner > 0 {
-                    dao_receivers.values.insert(0, DAOTokenReceiverInfo {
-                        receiver: assignment.worker,
-                        amount: share_token_per_validator,
-                        role: 1, // DAOTokenReceiverRole::Validator
-                    });
+                    dao_receivers.values.insert(
+                        0,
+                        DAOTokenReceiverInfo {
+                            receiver: assignment.worker,
+                            amount: share_token_per_validator,
+                            role: 1, // DAOTokenReceiverRole::Validator
+                        },
+                    );
                 }
             } else {
                 if fee_for_miner > 0 {
@@ -214,18 +233,22 @@ pub fn filter_commitment(acc: &mut WorkerHubStorage, inference: &mut Inference, 
                     //     assignment.worker,
                     //     fee_for_miner
                     // );
-                    // TransferHelper.safeTransfer(
-                    //     wEAI,
-                    //     assignment.worker,
-                    //     fee_for_miner
-                    // );
+                    let mut data = vec![];
+                    data.push(1);
+                    data.extend_from_slice(&assignment.id.to_le_bytes());
+                    data.extend_from_slice(&fee_for_miner.to_le_bytes());
+                    data.push(2);
+                    tasks.values.push(Task { data, fn_type: 1 });
                 }
                 if not_reached_limit && token_for_miner > 0 {
-                    dao_receivers.values.insert(0, DAOTokenReceiverInfo {
-                        receiver: assignment.worker,
-                        amount: token_for_miner,
-                        role: 0, // DAOTokenReceiverRole::Miner
-                    });
+                    dao_receivers.values.insert(
+                        0,
+                        DAOTokenReceiverInfo {
+                            receiver: assignment.worker,
+                            amount: token_for_miner,
+                            role: 0, // DAOTokenReceiverRole::Miner
+                        },
+                    );
                 }
             }
         }
@@ -249,16 +272,18 @@ pub fn filter_commitment(acc: &mut WorkerHubStorage, inference: &mut Inference, 
     }
 
     if inference.fee_l2 > 0 {
-        // TransferHelper.safeTransferNative(
-        //     l2_owner,
-        //     inference.fee_l2
-        // );
+        let mut data = vec![];
+        data.push(0);
+        data.extend(acc.l2_owner.to_bytes());
+        data.extend_from_slice(&inference.fee_l2.to_le_bytes());
+        tasks.values.push(Task { data, fn_type: 1 });
     }
     if inference.fee_treasury > 0 {
-        // TransferHelper.safeTransferNative(
-        //     treasury,
-        //     inference.fee_treasury
-        // );
+        let mut data = vec![];
+        data.push(0);
+        data.extend(acc.treasury.to_bytes());
+        data.extend_from_slice(&inference.fee_treasury.to_le_bytes());
+        tasks.values.push(Task { data, fn_type: 1 });
     }
 
     inference.status = 4;

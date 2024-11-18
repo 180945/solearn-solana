@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-
-use crate::SolLearnInfo;
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use crate::{SolLearnInfo, VaultAccount};
 
 #[derive(Accounts)]
 pub struct UpdateParamsVld<'info> {
@@ -53,6 +53,7 @@ pub enum AssignmentRole {
 pub struct Inference {
     pub id: u64,
     pub assignments: Vec<u64>,
+    pub digests: Hashes,
     pub input: Vec<u8>,
     pub value: u64,
     pub fee_l2: u64,
@@ -85,10 +86,11 @@ pub struct InferVld<'info> {
     #[account(mut)]
     pub miner_addresses: Account<'info, Pubkeys>,
     #[account(mut)]
+	pub tasks: Account<'info, Tasks>,
+    #[account(mut)]
     pub signer: Signer<'info>,
-    /// CHECK:
-    #[account(mut, constraint = *__program_id == recipient.key())]
-    pub recipient: UncheckedAccount<'info>,
+    #[account(mut)]
+	pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
 }
 
 #[derive(Accounts)]
@@ -98,9 +100,8 @@ pub struct UpdateInferVld<'info> {
     #[account(mut)]
     pub infs: Account<'info, Inference>,
     pub signer: Signer<'info>,
-    /// CHECK:
-    #[account(mut, constraint = *__program_id == recipient.key())]
-    pub recipient: UncheckedAccount<'info>,
+    #[account(mut)]
+	pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
 }
 
 #[account]
@@ -197,22 +198,95 @@ pub struct DAOTokenPercentage {
 }
 
 #[derive(Accounts)]
+#[instruction(epoch_id: u64)]
 pub struct UpdateEpochVld<'info> {
     pub system_program: Program<'info, System>,
     #[account(mut)]
     pub wh_account: Account<'info, WorkerHubStorage>,
     #[account(mut)]
     pub miner_addresses: Account<'info, Pubkeys>,
-    #[account(mut, seeds = [b"reward_in_epoch", signer.key().as_ref()], bump = miner_reward.bump)]
+    #[account(mut, seeds = [b"reward_in_epoch", epoch_id.to_le_bytes().as_ref()], bump = miner_reward.bump)]
+    pub miner_reward: Account<'info, MinerEpochState>,
+    // #[account(mut)]
+    // pub miner: Account<'info, Worker>,
+    pub signer: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SlashMinerByAdminVld<'info> {
+    pub system_program: Program<'info, System>,
+    #[account(mut)]
+    pub wh_account: Account<'info, WorkerHubStorage>,
+    #[account(mut)]
+    pub miner_addresses: Account<'info, Pubkeys>,
+    #[account(mut)]
     pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
     pub miner: Account<'info, Worker>,
+    /// CHECK:
+    #[account(mut, constraint = sol_learn_account.admin == signer.key())]
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
     pub signer: Signer<'info>,
 }
 
 #[derive(Accounts)]
 #[instruction(assignment_id: u64)]
+pub struct CreateAssignmentVld<'info> {
+	#[account(mut)]
+	pub assignment: Account<'info, Assignment>,
+	#[account(mut)]
+	pub tasks: Account<'info, Tasks>,
+}
+
+#[derive(Accounts)]
+#[instruction(assignment_id: u64)]
+pub struct PayMinerVld<'info> {
+	pub system_program: Program<'info, System>,
+	#[account(mut)]
+	pub tasks: Account<'info, Tasks>,
+	#[account(mut)]
+    pub assignment: Account<'info, Assignment>,
+    /// CHECK
+	#[account(mut)]
+	pub recipient: UncheckedAccount<'info>,
+	#[account(mut)]
+	pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+}
+
+#[derive(Accounts)]
+#[instruction(assignment_id: u64)]
+pub struct SlashMinerVld<'info> {
+	// pub system_program: Program<'info, System>,
+	#[account(mut)]
+	pub wh_account: Account<'info, WorkerHubStorage>,
+	#[account(mut)]
+	pub miner_addresses: Account<'info, Pubkeys>,
+	#[account(mut)]
+	pub miner: Account<'info, Worker>,
+	#[account(mut)]
+	pub tasks: Account<'info, Tasks>,
+	#[account(mut)]
+    pub assignment: Account<'info, Assignment>,
+	// #[account(mut)]
+	// pub signer: Signer<'info>,
+	#[account(mut)]
+	pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+	#[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner_pda.key())]
+    pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut)]
+    pub staking_token: InterfaceAccount<'info, Mint>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
+	#[account(mut)]
+    pub token_recipient: InterfaceAccount<'info, TokenAccount>,
+}
+
+
+
+#[derive(Accounts)]
+#[instruction(assignment_id: u64)]
 pub struct UpdateAssignmentVld<'info> {
+	pub system_program: Program<'info, System>,
     #[account(mut)]
     pub wh_account: Account<'info, WorkerHubStorage>,
     #[account(mut)]
@@ -221,14 +295,19 @@ pub struct UpdateAssignmentVld<'info> {
     pub assignment: Account<'info, Assignment>,
     #[account(mut)]
     pub miner_addresses: Account<'info, Pubkeys>,
-    #[account(mut)]
-    pub miner_reward: Account<'info, MinerEpochState>,
+    // #[account(mut)]
+    // pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
     pub miner: Account<'info, Worker>,
     #[account(mut)]
     pub voting_info: Account<'info, VotingInfo>,
     #[account(mut)]
-    pub digests: Account<'info, Hashes>,
+	pub tasks: Account<'info, Tasks>,
+    #[account(mut)]
+	pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+	/// CHECK
+    #[account(mut)]
+    pub recipient: UncheckedAccount<'info>,
     #[account(mut, seeds = [b"dao_receivers_info", signer.key().as_ref()], bump = dao_receiver_infos.bump)]
     pub dao_receiver_infos: Account<'info, DAOTokenReceiverInfos>,
     pub signer: Signer<'info>,
@@ -242,6 +321,17 @@ pub struct UpdateMinerAddressesByModelVld<'info> {
     #[account(mut)]
     pub miner_addresses: Account<'info, Pubkeys>,
 }
+
+#[derive(Accounts)]
+pub struct UpdateTaskVld<'info> {
+	#[account(mut)]
+	pub wh_account: Account<'info, WorkerHubStorage>,
+	#[account(mut)]
+	pub tasks: Account<'info, Tasks>,
+	#[account(mut)]
+	pub signer: Signer<'info>,
+}
+
 
 #[account]
 pub struct WorkerHubStorage {
@@ -294,6 +384,12 @@ pub struct WorkerHubStorage {
     // pub wEAI: Pubkey,
 }
 
+pub enum FnType {
+	CreateAssignment,
+	PayMiner,
+	SlashMiner,
+}
+
 #[account]
 pub struct Task {
 	pub fn_type: u8,
@@ -304,4 +400,3 @@ pub struct Task {
 pub struct Tasks {
 	pub values: Vec<Task>,
 }
-
