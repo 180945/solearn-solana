@@ -219,7 +219,7 @@ pub mod solearn {
         let decimals = ctx.accounts.staking_token.decimals;
         let solean_key = ctx.accounts.sol_learn_account.key().clone();
         let seeds = &[
-            &b"vault"[..], solean_key.as_ref()
+            "vault".as_bytes(), solean_key.as_ref(), &[ctx.accounts.vault_wallet_owner_pda.bump],
         ];
 
         let signer_seeds = &[&seeds[..]];
@@ -266,7 +266,7 @@ pub mod solearn {
         let decimals = ctx.accounts.staking_token.decimals;
         let solean_key = ctx.accounts.sol_learn_account.key().clone();
         let seeds = &[
-            &b"vault"[..], solean_key.as_ref()
+            "vault".as_bytes(), solean_key.as_ref(), &[ctx.accounts.vault_wallet_owner_pda.bump],
         ];
 
         let signer_seeds = &[&seeds[..]];

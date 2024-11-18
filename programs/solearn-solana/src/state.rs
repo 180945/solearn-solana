@@ -78,7 +78,7 @@ pub struct RemoveModel<'info> {
         mut, 
         close = admin, 
         seeds = [b"models", sol_learn_account.key().as_ref(), model.key().as_ref()], 
-        bump
+        bump = miners_of_model.bump
     )]
     pub miners_of_model: Account<'info, MinersOfModel>,
     pub system_program: Program<'info, System>,
@@ -131,7 +131,7 @@ pub struct Topup<'info> {
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
-        bump,
+        bump = miner_info.bump,
     )]
     pub miner_info: Account<'info, MinerInfo>,
     #[account(mut)]
@@ -158,13 +158,13 @@ pub struct MinerUnStaking<'info> {
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
-        bump,
+        bump = miner_account.bump,
     )]
     pub miner_account: Account<'info, MinerInfo>,
     #[account(
         mut,
         seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
-        bump
+        bump = miners_of_model.bump,
     )]
     pub miners_of_model: Account<'info, MinersOfModel>,
     pub system_program: Program<'info, System>,
@@ -181,7 +181,7 @@ pub struct MinerClaimReward<'info> {
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
-        bump,
+        bump = miner_account.bump,
     )]
     pub miner_account: Account<'info, MinerInfo>,
     #[account(mut)]
@@ -210,7 +210,7 @@ pub struct MinerClaim<'info> {
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
-        bump,
+        bump = miner_account.bump,
     )]
     pub miner_account: Account<'info, MinerInfo>,
     #[account(mut)]
@@ -238,7 +238,7 @@ pub struct JoinForMinting<'info> {
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
-        bump,
+        bump = miner_account.bump,
     )]
     pub miner_account: Account<'info, MinerInfo>,
     #[account(
@@ -247,7 +247,7 @@ pub struct JoinForMinting<'info> {
         realloc::payer = miner,
         realloc::zero = false,
         seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
-        bump
+        bump = miners_of_model.bump
     )]
     pub miners_of_model: Account<'info, MinersOfModel>,
     pub models: Account<'info, Models>,
