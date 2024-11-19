@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-use crate::{MinerInfo, SolLearnInfo, VaultAccount};
+use crate::{MinerInfo, Models, SolLearnInfo, VaultAccount};
 
 #[derive(Accounts)]
 pub struct UpdateParamsVld<'info> {
@@ -25,12 +25,12 @@ pub struct Pubkeys {
     pub values: Vec<Pubkey>,
 }
 
-#[account]
-pub struct Model {
-    pub minimum_fee: u64,
-    pub tier: u32,
-    pub address: Pubkey,
-}
+// #[account]
+// pub struct Models {
+//     pub minimum_fee: u64,
+//     pub tier: u32,
+//     pub address: Pubkey,
+// }
 pub struct UnstakeRequest {}
 
 pub enum InferenceStatus {
@@ -69,8 +69,14 @@ pub struct Inference {
     pub bump: u8,
 }
 
+#[account]
+pub struct Referrer {
+	pub bump: u8,
+	pub pubkey: Pubkey,
+}
+
 #[derive(Accounts)]
-#[instruction(inference_id: u64)]
+#[instruction(inference_id: u64, creator: Pubkey)]
 pub struct InferVld<'info> {
     #[account(
         init,
@@ -87,6 +93,10 @@ pub struct InferVld<'info> {
     pub miner_addresses: Account<'info, Pubkeys>,
     #[account(mut)]
 	pub tasks: Account<'info, Tasks>,
+	#[account(mut)]
+	pub models: Account<'info, Models>,
+	#[account(mut, seeds = [b"referrer", creator.to_bytes().as_ref()], bump = referrer.bump)]
+	pub referrer: Account<'info, Referrer>,
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(mut)]
@@ -335,7 +345,7 @@ pub struct UpdateTaskVld<'info> {
 
 #[account]
 pub struct WorkerHubStorage {
-    pub models: Vec<Model>,
+    pub models: Vec<Models>,
     pub miner_addresses: Pubkeys,
     pub inference_number: u64,
     pub assignment_number: u64,

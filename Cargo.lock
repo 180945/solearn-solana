@@ -1092,6 +1092,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
+name = "hybrid-model"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solearn_solana",
+]
+
+[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2027,7 +2036,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "solearn-solana"
+name = "solearn_solana"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",

@@ -274,6 +274,8 @@ impl VaultAccount {
 pub struct Models {
     pub bump: u8, 
     pub data: Vec<u8>,
+    pub minimum_fee: u64,
+    pub tier: u32,
 }
 
 impl Models {

@@ -313,19 +313,19 @@ pub fn get_threshold_value(x: u64) -> u64 {
     (x * 2) / 3 + if x % 3 == 0 { 0 } else { 1 }
 }
 
-pub fn get_models_as_map(models: &Vec<Model>) -> HashMap<Pubkey, Model> {
-    let mut map = HashMap::new();
-    for model in models {
-        let model = Model {
-            minimum_fee: model.minimum_fee,
-            tier: model.tier,
-            address: model.address,
-        };
+// pub fn get_models_as_map(models: &Vec<Model>) -> HashMap<Pubkey, Model> {
+//     let mut map = HashMap::new();
+//     for model in models {
+//         let model = Model {
+//             minimum_fee: model.minimum_fee,
+//             tier: model.tier,
+//             address: model.address,
+//         };
 
-        map.insert(model.address, model);
-    }
-    map
-}
+//         map.insert(model.address, model);
+//     }
+//     map
+// }
 
 pub fn random_number(clk: &Clock, nonce: u64, range: u64) -> u64 {
     if range == 0 {

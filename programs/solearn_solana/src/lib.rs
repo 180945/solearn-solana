@@ -351,11 +351,12 @@ pub mod solearn {
         inference_id: u64,
     ) -> Result<u64> {
         let acc = &mut ctx.accounts.wh_account;
-        let models_map = get_models_as_map(&acc.models);
-        let model = models_map.get(&creator).unwrap();
+        let model = &mut ctx.accounts.models;
         if model.tier == 0 {
             return Err(SolLearnError::Unauthorized.into());
         }
+        let b: [u8; 32] = model.data[0..32].try_into().unwrap();
+        let model_pubkey = Pubkey::new_from_array(b);
 
         let scoring_fee = validate_enough_fee_to_use(model.minimum_fee, _value)?;
 
@@ -384,8 +385,8 @@ pub mod solearn {
         inference.fee_treasury = fee_treasury;
         inference.value = value - fee_l2 - fee_treasury;
         inference.creator = creator;
-        // inference.referrer = referrer_of[creator];
-        inference.model_address = ctx.accounts.signer.key();
+        inference.referrer = ctx.accounts.referrer.pubkey;
+        inference.model_address = model_pubkey;
         inference.bump = ctx.bumps.infs;
 
         let slot_number = Clock::get()?.slot;
@@ -396,7 +397,7 @@ pub mod solearn {
         inference.reveal_timeout = commit_timeout + acc.reveal_duration;
         inference.status = 1;
 
-        let model = inference.model_address;
+        // let model = inference.model_address;
         let miner_addresses = &mut ctx.accounts.miner_addresses;
         if miner_addresses.values.len() == 0 {
             return Err(SolLearnError::NoMinerAvailable.into());
@@ -418,7 +419,7 @@ pub mod solearn {
 
             let miner_ind = (rand_uint as usize) % miner_addresses.values.len();
             let miner = miner_addresses.values[miner_ind];
-            let assignment = &mut ctx.accounts.assignment;
+            // let assignment = &mut ctx.accounts.assignment;
             miner_addresses.values.remove(miner_ind);
             let assignment_id = acc.assignment_number;
             acc.assignment_number += 1;
