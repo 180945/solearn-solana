@@ -3,12 +3,14 @@ pub mod state;
 
 use state::*;
 use errors::*;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{mint_to, MintTo};
 use mpl_token_metadata::types::{Collection, Creator, DataV2};
 use anchor_spl::metadata::{ 
     create_master_edition_v3, create_metadata_accounts_v3, CreateMasterEditionV3, CreateMetadataAccountsV3
 };
+use solearn_solana::cpi::accounts::InferVld;
 
 declare_id!("nuvdhmYq5Z2Eg4nBi29Tu2VcbpE9nuiCQ68rkyAB3A1");
 
@@ -22,8 +24,6 @@ pub mod nft_program {
         name: String,
         symbol: String,
         uri: String,
-        price: f32,
-        cant: u64,
     ) -> Result<()> {
         msg!("Creating seeds");
         let id_bytes = id.to_le_bytes();
@@ -107,8 +107,6 @@ pub mod nft_program {
         name: String,
         symbol: String,
         uri: String,
-        prompt: String,
-        fee: u64,
     ) -> Result<()> {
         msg!("Creating seeds");
         let id_bytes = id_collection.to_le_bytes();
@@ -195,16 +193,25 @@ pub mod nft_program {
 
         msg!("Minted NFT successfully");
 
-        // create data prompt
-        ctx.accounts.promt_account.bump = ctx.bumps.promt_account;
-        ctx.accounts.promt_account.data = prompt;
-        ctx.accounts.promt_account.fee = fee;
+        Ok(())
+    }
 
+    pub fn add_prompt(ctx: Context<AddPrompt>, id_collection: u64, id_nft: u64, prompt: Vec<u8>) -> Result<()> {
+        msg!("Instruction: Add Prompt");
+
+        // Initialize the prompt account with the given prompt data
+        ctx.accounts.promt_account.data = prompt.clone();
+
+        emit!(PromptUpdated {
+            id_collection,
+            id_nft,
+            prompt,
+        });
 
         Ok(())
     }
 
-    pub fn update_prompt(ctx: Context<UpdatePrompt>, id_collection: u64, id_nft: u64, prompt: String) -> Result<()> {
+    pub fn update_prompt(ctx: Context<UpdatePrompt>, id_collection: u64, id_nft: u64, prompt: Vec<u8>) -> Result<()> {
         msg!("Instruction: Update Prompt");
 
         // Update the prompt account with the new prompt data
@@ -234,7 +241,31 @@ pub mod nft_program {
         Ok(())
     }
     
-
     // infer 
+    pub fn infer_request(ctx: Context<SytemInfer>, input: Vec<u8>, creator: Pubkey, _value: u64, inference_id: u64,) -> Result<()> {
+        msg!("Instruction: Infer Request");
+
+        // transfer fee to agent owner
+        
+        // append infer request
+
+        // call infer to workerhub
+        let cpi_program = ctx.accounts.solearn_program.to_account_info();
+        let cpi_accounts = InferVld {
+            infs: ctx.accounts.infs.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(), // Add missing field
+            wh_account: ctx.accounts.wh_account.to_account_info(), // Add missing field
+            assignment: ctx.accounts.assignment.to_account_info(), // Add missing field
+            miner_addresses: ctx.accounts.miner_addresses.to_account_info(), // Add missing field
+            tasks: ctx.accounts.tasks.to_account_info(), // Add missing field
+            signer: ctx.accounts.signer.to_account_info(), // Add missing field
+            vault_wallet_owner_pda: ctx.accounts.vault_wallet_owner_pda.to_account_info(), // Add missing field
+        };
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        solearn_solana::cpi::infer(cpi_ctx, input, creator, _value, inference_id)?;
+        
+
+        Ok(())
+    }
 
 }

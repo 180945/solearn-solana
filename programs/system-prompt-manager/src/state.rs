@@ -3,6 +3,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount};
 use anchor_spl::token::{Token};
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::metadata::{Metadata};
+use solearn_solana::program::Solearn;
 
 // init new nft
 #[derive(Accounts)]
@@ -62,7 +63,7 @@ pub struct CreateNFT<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(id_collection: u64, id_nft: u64, prompt: String)]
+#[instruction(id_collection: u64, id_nft: u64)]
 pub struct MintToCollection<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -119,6 +120,19 @@ pub struct MintToCollection<'info> {
     pub nft_metadata: UncheckedAccount<'info>,
     /// CHECK:
     pub collection: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(id_collection: u64, id_nft: u64, prompt: String)]
+pub struct AddPrompt<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        associated_token::mint = mint,
+        associated_token::authority = payer,
+    )]
+    pub token_account: InterfaceAccount<'info, TokenAccount>,
     /// init new promt account
     #[account( 
         init,
@@ -130,6 +144,7 @@ pub struct MintToCollection<'info> {
         bump,
     )]
     pub promt_account: Account<'info, PromptAccount>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -187,13 +202,62 @@ pub struct UpdateFee<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+#[instruction(id_collection: u64, id_nft: u64)]
+pub struct SytemInfer<'info> {
+    /// CHECK:
+    #[account(mut)]
+    pub infs: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+    /// CHECK:
+    #[account(mut)]
+    pub wh_account: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub assignment: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub miner_addresses: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub tasks: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub vault_wallet_owner_pda: UncheckedAccount<'info>,
+    pub solearn_program: Program<'info, Solearn>,
+    #[account( 
+        seeds = ["mint".as_bytes(), 
+                id_collection.to_le_bytes().as_ref(),
+                id_nft.to_le_bytes().as_ref()], 
+        bump,
+    )]
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        associated_token::mint = mint,
+        associated_token::authority = signer,
+    )]
+    pub token_account: InterfaceAccount<'info, TokenAccount>,
+    /// init new promt account
+    #[account( 
+        mut,
+        seeds = ["promt".as_bytes(), 
+                id_collection.to_le_bytes().as_ref(),
+                id_nft.to_le_bytes().as_ref()], 
+        bump = promt_account.bump,
+    )]
+    pub promt_account: Account<'info, PromptAccount>,
+}
+
 
 /// STRUCTS
 #[account]
 pub struct PromptAccount {
     pub bump: u8,
-    pub fee: u64,
-    pub data: String, 
+    pub fee: u64, // fee per request
+    pub data: Vec<u8>, 
 }
 
 
@@ -202,7 +266,7 @@ pub struct PromptAccount {
 pub struct PromptUpdated {
     pub id_collection: u64,
     pub id_nft: u64,
-    pub prompt: String,
+    pub prompt: Vec<u8>,
 }
 
 

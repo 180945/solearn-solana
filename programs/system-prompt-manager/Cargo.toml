@@ -20,3 +20,4 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
 mpl-token-metadata = "4.1.2"
 anchor-spl = {version = "0.30.1", features = ["metadata"]}
+solearn-solana = {version = "0.1.0", path = "../solearn-solana", features = ["no-entrypoint", "cpi"] }

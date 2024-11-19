@@ -5,7 +5,6 @@ mod utils;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak::hash;
-use anchor_lang::system_program;
 use anchor_spl::token::{self, transfer_checked, Transfer, TransferChecked};
 use errors::*;
 use state::*;
@@ -212,6 +211,7 @@ pub mod solearn {
 
             // Update the account data
             ctx.accounts.miners_of_model.data = data;
+            ctx.accounts.miner_account.model_index = 0;
         } else {
             return Err(SolLearnError::MinerNotRegistered.into());
         }

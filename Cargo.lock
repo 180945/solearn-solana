@@ -2307,6 +2307,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "mpl-token-metadata",
+ "solearn-solana",
 ]
 
 [[package]]
