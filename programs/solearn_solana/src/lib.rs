@@ -41,6 +41,12 @@ pub mod solearn {
         ctx.accounts.models.bump = ctx.bumps.models;
         msg!("models PDA bump seed: {}", ctx.bumps.models);
 
+        let acc = &mut ctx.accounts.wh_account;
+        acc.inference_number = 0;
+        acc.assignment_number = 0;
+        acc.current_epoch = 0;
+        // TODO
+
         Ok(())
     }
 
@@ -500,6 +506,12 @@ pub mod solearn {
             let current_len = miner_addresses.values.len();
             miner_addresses.values.insert(current_len, miner);
         }
+        emit!(NewInference {
+            inference_id,
+            creator,
+            model_address: model_pubkey,
+            value,
+        });
 
         Ok(0)
     }
@@ -533,6 +545,13 @@ pub mod solearn {
         assignment.worker = worker;
         assignment.role = role;
 
+        emit!(NewAssignment {
+            assignment_id,
+            inference_id,
+            worker,
+        });
+
+
         Ok(())
     }
 
@@ -558,6 +577,12 @@ pub mod solearn {
         }
 
         inference.value += value;
+        emit!(TopUpInfer {
+            inference_id,
+            creator: ctx.accounts.signer.key(),
+            value,
+        });
+
 
         Ok(())
     }
@@ -584,6 +609,12 @@ pub mod solearn {
 
         assignment.role = 2;
         inference.processed_miner = ctx.accounts.signer.key();
+
+        emit!(MinerRoleSeized {
+            assignment_id,
+            inference_id: _infer_id,
+            sender: ctx.accounts.signer.key(),
+        });
 
         Ok(())
     }
@@ -627,6 +658,15 @@ pub mod solearn {
         assignment.commitment = digest.to_bytes();
         inference.status = 2;
         inference.assignments.push(assignment.id);
+
+        emit!(SolutionSubmission {
+            assignment_id,
+            sender: ctx.accounts.signer.key(),
+        });
+        emit!(InferenceStatusUpdate {
+            inference_id: infer_id,
+            status: 2,
+        });
 
         Ok(())
     }
@@ -675,7 +715,16 @@ pub mod solearn {
 
         if voting_info.total_commit as usize == inference.assignments.len() - 1 {
             inference.status = 3;
+            emit!(InferenceStatusUpdate {
+                inference_id: infer_id,
+                status: 3,
+            });
         }
+        emit!(CommitmentSubmission {
+            assignment_id,
+            sender: ctx.accounts.signer.key(),
+            commitment,
+        });
 
         Ok(())
     }
@@ -719,6 +768,7 @@ pub mod solearn {
         }
 
         let mut concatenated: Vec<u8> = nonce.to_le_bytes().to_vec();
+        let sender_key = ctx.accounts.signer.key().clone();
         concatenated.extend(ctx.accounts.signer.key().to_bytes().to_vec());
         concatenated.extend(data.clone());
         let reveal_hash = hash(&mut concatenated);
@@ -751,6 +801,13 @@ pub mod solearn {
         if voting_info.total_reveal as usize == inference.assignments.len() - 1 {
             resolve_inference(ctx, assignment_id)?;
         }
+
+        emit!(RevealSubmission {
+            assignment_id,
+            sender: sender_key,
+            nonce,
+            data,
+        });
 
         Ok(())
     }
@@ -862,6 +919,11 @@ pub mod solearn {
                 }
             }
         }
+
+        emit!(InferenceStatusUpdate {
+            inference_id: infer_id,
+            status: inference.status,
+        });
 
         Ok(())
     }
@@ -1031,6 +1093,9 @@ pub mod solearn {
         only_updated_epoch(acc)?;
 
         acc.fine_percentage = fine_percentage;
+        emit!(FinePercentageUpdated {
+            new_fine_percentage: fine_percentage,
+        });
 
         Ok(())
     }
@@ -1043,6 +1108,9 @@ pub mod solearn {
         only_updated_epoch(acc)?;
 
         acc.penalty_duration = penalty_duration;
+        emit!(PenaltyDurationUpdated {
+            new_penalty_duration: penalty_duration,
+        });
 
         Ok(())
     }
@@ -1052,6 +1120,9 @@ pub mod solearn {
         only_updated_epoch(acc)?;
 
         acc.min_fee_to_use = min_fee_to_use;
+        emit!(MinFeeToUseUpdated {
+            new_min_fee_to_use: min_fee_to_use,
+        });
 
         Ok(())
     }
@@ -1061,6 +1132,9 @@ pub mod solearn {
         only_updated_epoch(acc)?;
 
         acc.l2_owner = l2_owner_address;
+        emit!(L2OwnerUpdated {
+            new_l2_owner: l2_owner_address,
+        });
 
         Ok(())
     }
@@ -1070,6 +1144,10 @@ pub mod solearn {
         only_updated_epoch(acc)?;
 
         acc.dao_token = dao_token_address;
+        emit!(DaoTokenUpdated {
+            new_dao_token: dao_token_address,
+        });
+
 
         Ok(())
     }
@@ -1082,6 +1160,10 @@ pub mod solearn {
         only_updated_epoch(acc)?;
 
         acc.treasury = treasury_address;
+        emit!(TreasuryAddressUpdated {
+            new_treasury: treasury_address,
+        });
+
 
         Ok(())
     }
@@ -1094,6 +1176,10 @@ pub mod solearn {
         only_updated_epoch(acc)?;
 
         acc.fee_ratio_miner_validator = new_ratio;
+        emit!(FeeRatioMinerValidatorUpdated {
+            new_fee_ratio_miner_validator: new_ratio as u64,
+        });
+
 
         Ok(())
     }
@@ -1106,6 +1192,9 @@ pub mod solearn {
         only_updated_epoch(acc)?;
 
         acc.dao_token_reward = new_dao_token_reward;
+        emit!(DaoTokenRewardUpdated {
+            new_dao_token_reward,
+        });
 
         Ok(())
     }

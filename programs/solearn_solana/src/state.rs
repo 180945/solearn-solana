@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
+use crate::WorkerHubStorage;
+
 // init pda to store list of models
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -25,6 +27,17 @@ pub struct Initialize<'info> {
         bump
     )]
     pub models: Account<'info, Models>,
+    #[account(
+        init, 
+        // realloc = 8 + wh_account.len(),
+        // realloc::payer = admin, 
+        // realloc::zero = false,
+        payer = admin, 
+        space = 8 + WorkerHubStorage::INIT_LEN,
+        seeds = [b"worker_hub_storage", sol_learn_account.key().as_ref()], 
+        bump
+    )]
+    pub wh_account: Account<'info, WorkerHubStorage>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
 }

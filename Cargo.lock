@@ -1098,7 +1098,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "solearn_solana",
+ "solearn-solana",
 ]
 
 [[package]]
@@ -2061,7 +2061,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "solearn_solana"
+name = "solearn-solana"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",

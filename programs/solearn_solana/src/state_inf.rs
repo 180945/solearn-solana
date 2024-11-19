@@ -25,6 +25,12 @@ pub struct Pubkeys {
     pub values: Vec<Pubkey>,
 }
 
+impl Pubkeys {
+    pub fn len(&self) -> usize {
+        8 + self.values.len() * 32
+    }
+}
+
 // #[account]
 // pub struct Models {
 //     pub minimum_fee: u64,
@@ -345,7 +351,7 @@ pub struct UpdateTaskVld<'info> {
 
 #[account]
 pub struct WorkerHubStorage {
-    pub models: Vec<Models>,
+    // pub models: Vec<Models>,
     pub miner_addresses: Pubkeys,
     pub inference_number: u64,
     pub assignment_number: u64,
@@ -394,6 +400,19 @@ pub struct WorkerHubStorage {
     // pub wEAI: Pubkey,
 }
 
+impl WorkerHubStorage {
+    pub const INIT_LEN: usize = 8 + 8 + 8 + 8 + 32 + 32 + 2 + 2 + 2 + 8 + 8 + 8 + 8
+        + 1 + 8 + 8 + 8 + 2 + 32 + 8
+        + 2 * 5
+        + 8 + 8;
+    pub fn len(&self) -> usize {
+        8 + 8 + 8 + 8 + 32 + 32 + 2 + 2 + 2 + 8 + 8 + 8 + 8
+        + 1 + 8 + 8 + 8 + 2 + 32 + 8
+        + 2 * 5
+        + 8 + self.miner_addresses.len()
+    }
+}
+
 pub enum FnType {
 	CreateAssignment,
 	PayMiner,
@@ -410,3 +429,123 @@ pub struct Task {
 pub struct Tasks {
 	pub values: Vec<Task>,
 }
+
+#[event]
+pub struct NewInference {
+    pub inference_id: u64,
+    pub model_address: Pubkey,
+    pub creator: Pubkey,
+    pub value: u64,
+}
+
+#[event]
+pub struct TopUpInfer {
+    pub inference_id: u64,
+    pub creator: Pubkey,
+    pub value: u64,
+}
+
+#[event]
+pub struct NewAssignment {
+    pub assignment_id: u64,
+    pub inference_id: u64,
+    pub worker: Pubkey,
+    // pub expired_at: u64,
+}
+
+#[event]
+pub struct MinerRoleSeized {
+    pub assignment_id: u64,
+    pub inference_id: u64,
+    pub sender: Pubkey,
+}
+
+#[event]
+pub struct InferenceStatusUpdate {
+    pub inference_id: u64,
+    pub status: u8,
+}
+
+#[event]
+pub struct SolutionSubmission {
+    pub sender: Pubkey,
+    pub assignment_id: u64,
+}
+
+#[event]
+pub struct CommitmentSubmission {
+    pub sender: Pubkey,
+    pub assignment_id: u64,
+    pub commitment: [u8; 32],
+}
+
+#[event]
+pub struct RevealSubmission {
+    pub sender: Pubkey,
+    pub assignment_id: u64,
+    pub nonce: u64,
+    pub data: Vec<u8>,
+}
+
+#[event]
+pub struct MinerPenalized {
+    pub miner: Pubkey,
+    pub model_address: Pubkey,
+    pub treasury: Pubkey,
+    pub fine: u64,
+}
+
+#[event]
+pub struct MinerDeactivated {
+    pub miner: Pubkey,
+    pub model_address: Pubkey,
+    pub active_time: u64,
+}
+
+#[event]
+pub struct FinePercentageUpdated {
+    // pub fine_percentage: u16,
+    pub new_fine_percentage: u16,
+}
+
+#[event]
+pub struct PenaltyDurationUpdated {
+    // pub penalty_duration: u64,
+    pub new_penalty_duration: u64,
+}
+
+#[event]
+pub struct MinFeeToUseUpdated {
+    // pub min_fee_to_use: u64,
+    pub new_min_fee_to_use: u64,
+}
+
+#[event]
+pub struct L2OwnerUpdated {
+    // pub l2_owner: Pubkey,
+    pub new_l2_owner: Pubkey,
+}
+
+#[event]
+pub struct DaoTokenUpdated {
+    // pub dao_token: Pubkey,
+    pub new_dao_token: Pubkey,
+}
+
+#[event]
+pub struct TreasuryAddressUpdated {
+    // pub treasury: Pubkey,
+    pub new_treasury: Pubkey,
+}
+
+#[event]
+pub struct FeeRatioMinerValidatorUpdated {
+    pub new_fee_ratio_miner_validator: u64,
+}
+
+#[event]
+pub struct DaoTokenRewardUpdated {
+    pub new_dao_token_reward: u64,
+}
+
+

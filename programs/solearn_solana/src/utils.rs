@@ -71,6 +71,13 @@ pub fn _slash_miner(
     }
     miner_addresses.values.remove(remove_ind);
     miner.active_time = Clock::get()?.slot + acc.penalty_duration;
+    emit!(MinerDeactivated {
+        miner: miner.miner,
+        model_address: miner.miner,
+        active_time: miner.active_time,
+    });
+
+
 
     if is_fined {
         let fine = (acc.miner_minimum_stake * acc.fine_percentage as u64) / PERCENTAGE_DENOMINATOR;
@@ -79,6 +86,12 @@ pub fn _slash_miner(
         } else {
             miner.stake_amount -= fine;
         }
+        emit!(MinerPenalized {
+            miner: miner.miner,
+            model_address: miner.miner,
+            treasury: acc.treasury,
+            fine,
+        });
 
         Ok(fine)
 
