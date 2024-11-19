@@ -5,7 +5,6 @@ mod utils;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak::hash;
-use anchor_lang::system_program;
 use anchor_spl::token::{self, transfer_checked, Transfer, TransferChecked};
 use errors::*;
 use state::*;
@@ -18,7 +17,7 @@ declare_id!("7MHr6ZPGTWZkRk6m52GfEWoMxSV7EoDjYyoXAYf3MBwS");
 pub mod solearn {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, min_stake: u64) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, min_stake: u64, reward_per_epoch: u64, epoch_duration: u64) -> Result<()> {
         msg!("Instruction: Initialize");
 
         let sol_learn_account = &mut ctx.accounts.sol_learn_account;
@@ -29,6 +28,10 @@ pub mod solearn {
         sol_learn_account.total_models = 0;
         sol_learn_account.total_infer = 0;
         sol_learn_account.miner_min_stake = min_stake;
+        sol_learn_account.reward_per_epoch = reward_per_epoch;
+        sol_learn_account.epoch_duration = epoch_duration;
+        sol_learn_account.last_epoch = 0;
+        sol_learn_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
 
         // vault account
         ctx.accounts.vault_wallet_owner.bump = ctx.bumps.vault_wallet_owner;
@@ -49,9 +52,8 @@ pub mod solearn {
         }
 
         // set miner info
-        let miner_info = &mut ctx.accounts.miner_info;
-        miner_info.stake_amount = stake_amount;
-        miner_info.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+        let miner_account = &mut ctx.accounts.miner_account;
+        miner_account.stake_amount = stake_amount;
 
         if ctx.accounts.models.data.len() == 0 {
             return Err(SolLearnError::NoModelRegistered.into());
@@ -67,7 +69,7 @@ pub mod solearn {
             [model_index as usize * 32..(model_index + 1) as usize * 32]
             .try_into()
             .expect("Invalid length");
-        miner_info.model = model;
+        miner_account.model = model;
         ctx.accounts.sol_learn_account.total_miner += 1;
 
         let cpi_accounts = Transfer {
@@ -92,8 +94,12 @@ pub mod solearn {
     pub fn join_for_minting(ctx: Context<JoinForMinting>) -> Result<()> {
         msg!("Instruction: Join For Minting");
 
-        // Assuming _updateEpoch() is a function that updates the epoch based on the current clock
-        // _update_epoch(&ctx.accounts.sysvar_clock)?;
+        // update epoch section
+        let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64) - ctx.accounts.sol_learn_account.last_time) / ctx.accounts.sol_learn_account.epoch_duration;
+        if n > 0 {
+            ctx.accounts.sol_learn_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+            ctx.accounts.sol_learn_account.last_epoch += n;
+        }
 
         if ctx.accounts.sol_learn_account.miner_min_stake > ctx.accounts.miner_account.stake_amount
         {
@@ -121,8 +127,8 @@ pub mod solearn {
             .data
             .extend_from_slice(ctx.accounts.miner.key().as_ref());
 
-        // update miner join time
-        ctx.accounts.miner_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+        // update miner join epoch time
+        ctx.accounts.miner_account.last_epoch = ctx.accounts.sol_learn_account.last_epoch;        
         ctx.accounts.miner_account.is_active = true;
         ctx.accounts.miner_account.model_index = (miners_of_model.data.len() / 32 + 1) as u64;
 
@@ -141,9 +147,6 @@ pub mod solearn {
     // topup
     pub fn topup(ctx: Context<Topup>, topup_amount: u64) -> Result<()> {
         msg!("Instruction: Top up staking amount");
-
-        // Assuming _updateEpoch() is a function that updates the epoch based on the current clock
-        // _update_epoch(&ctx.accounts.sysvar_clock)?;
 
         let miner_info = &mut ctx.accounts.miner_info;
         miner_info.stake_amount += topup_amount;
@@ -170,6 +173,13 @@ pub mod solearn {
     pub fn miner_unstaking(ctx: Context<MinerUnStaking>) -> Result<()> {
         msg!("Instruction: Miner unregister");
 
+        // update epoch section
+        let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64) - ctx.accounts.sol_learn_account.last_time) / ctx.accounts.sol_learn_account.epoch_duration;
+        if n > 0 {
+            ctx.accounts.sol_learn_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+            ctx.accounts.sol_learn_account.last_epoch += n;
+        }
+
         if ctx.accounts.miner_account.model_index != 0 {
             return Err(SolLearnError::MinerNotRegistered.into());
         }
@@ -184,8 +194,7 @@ pub mod solearn {
             + ctx.accounts.sol_learn_account.unstake_delay_time;
         if ctx.accounts.miner_account.is_active {
             ctx.accounts.miner_account.is_active = false;
-
-            // todo: update epoch reward here
+            ctx.accounts.miner_account.reward += (ctx.accounts.sol_learn_account.last_epoch - ctx.accounts.miner_account.last_epoch) * ctx.accounts.sol_learn_account.reward_per_epoch;
         }
 
         // remove from MinersOfModel
@@ -202,6 +211,7 @@ pub mod solearn {
 
             // Update the account data
             ctx.accounts.miners_of_model.data = data;
+            ctx.accounts.miner_account.model_index = 0;
         } else {
             return Err(SolLearnError::MinerNotRegistered.into());
         }
@@ -209,8 +219,9 @@ pub mod solearn {
         Ok(())
     }
 
-    // claim
-    pub fn miner_claim(ctx: Context<MinerClaim>) -> Result<()> {
+    // claim unstaking amount 
+    pub fn miner_claim_unstaked(ctx: Context<MinerClaim>) -> Result<()> {
+        
         if ctx.accounts.miner_account.is_active {
             return Err(SolLearnError::Activated.into());
         }
@@ -232,7 +243,9 @@ pub mod solearn {
         // this used for unstaking
         let decimals = ctx.accounts.staking_token.decimals;
         let solean_key = ctx.accounts.sol_learn_account.key().clone();
-        let seeds = &[&b"vault"[..], solean_key.as_ref()];
+        let seeds = &[
+            "vault".as_bytes(), solean_key.as_ref(), &[ctx.accounts.vault_wallet_owner_pda.bump],
+        ];
 
         let signer_seeds = &[&seeds[..]];
 
@@ -251,6 +264,55 @@ pub mod solearn {
         );
 
         transfer_checked(ctx_transfer_token, unstake_amount, decimals)?;
+
+        Ok(())
+    }
+
+    // claim reward
+    pub fn miner_claim_reward(ctx: Context<MinerClaimReward>) -> Result<()> {
+        
+        // update epoch section
+        let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64) - ctx.accounts.sol_learn_account.last_time) / ctx.accounts.sol_learn_account.epoch_duration;
+        if n > 0 {
+            ctx.accounts.sol_learn_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+            ctx.accounts.sol_learn_account.last_epoch += n;
+        }
+
+        let mut reward = 0 ;
+        if ctx.accounts.miner_account.is_active {
+            // udpate latest reward
+            let reward = ctx.accounts.miner_account.reward + (ctx.accounts.sol_learn_account.last_epoch - ctx.accounts.miner_account.last_epoch) * ctx.accounts.sol_learn_account.reward_per_epoch;
+            if reward == 0 {
+                return Err(SolLearnError::NothingToClaim.into())
+            }
+
+            ctx.accounts.miner_account.last_epoch = ctx.accounts.sol_learn_account.last_epoch;
+        }
+
+        // this used for unstaking 
+        let decimals = ctx.accounts.staking_token.decimals;
+        let solean_key = ctx.accounts.sol_learn_account.key().clone();
+        let seeds = &[
+            "vault".as_bytes(), solean_key.as_ref(), &[ctx.accounts.vault_wallet_owner_pda.bump],
+        ];
+
+        let signer_seeds = &[&seeds[..]];
+
+        // transfer token to contract
+        let cpi_accounts = TransferChecked {
+            from: ctx.accounts.miner_staking_wallet.to_account_info(),
+            to: ctx.accounts.vault_staking_wallet.to_account_info(),
+            authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+            mint: ctx.accounts.staking_token.clone().to_account_info()
+        };
+
+        let ctx_transfer_token = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer_seeds
+        );
+
+        transfer_checked(ctx_transfer_token, reward, decimals)?;
 
         Ok(())
     }
@@ -290,8 +352,7 @@ pub mod solearn {
         Ok(())
     }
 
-    // slash miner
-    // claim reward
+    
     // epoch update
     // set fine percentage
     // setPenaltyDuration
