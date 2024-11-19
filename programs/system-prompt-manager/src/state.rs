@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenAccount};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use anchor_spl::token::{Token};
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::metadata::{Metadata};
@@ -139,7 +139,8 @@ pub struct AddPrompt<'info> {
         payer = payer, 
         seeds = ["promt".as_bytes(), 
                 id_collection.to_le_bytes().as_ref(),
-                id_nft.to_le_bytes().as_ref()], 
+                id_nft.to_le_bytes().as_ref(),
+                token_account.key().as_ref()],
         space = 8 + 1 + 8 + 4 + prompt.len(),
         bump,
     )]
@@ -166,7 +167,8 @@ pub struct UpdatePrompt<'info> {
         realloc::zero = false,
         seeds = ["promt".as_bytes(), 
                 id_collection.to_le_bytes().as_ref(),
-                id_nft.to_le_bytes().as_ref()], 
+                id_nft.to_le_bytes().as_ref(),
+                token_account.key().as_ref()], 
         bump = promt_account.bump,
     )]
     pub promt_account: Account<'info, PromptAccount>,
@@ -195,7 +197,8 @@ pub struct UpdateFee<'info> {
         mut,
         seeds = ["promt".as_bytes(), 
                 id_collection.to_le_bytes().as_ref(),
-                id_nft.to_le_bytes().as_ref()], 
+                id_nft.to_le_bytes().as_ref(),
+                token_account.key().as_ref()], 
         bump = promt_account.bump,
     )]
     pub promt_account: Account<'info, PromptAccount>,
@@ -235,20 +238,24 @@ pub struct SytemInfer<'info> {
         bump,
     )]
     pub mint: InterfaceAccount<'info, Mint>,
+    #[account(mut)]
+    pub agent_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(
+        mut,
         associated_token::mint = mint,
         associated_token::authority = signer,
     )]
-    pub token_account: InterfaceAccount<'info, TokenAccount>,
+    pub inferer_token_account: InterfaceAccount<'info, TokenAccount>,
     /// init new promt account
     #[account( 
-        mut,
         seeds = ["promt".as_bytes(), 
                 id_collection.to_le_bytes().as_ref(),
-                id_nft.to_le_bytes().as_ref()], 
+                id_nft.to_le_bytes().as_ref(),
+                agent_token_account.key().as_ref()], 
         bump = promt_account.bump,
     )]
     pub promt_account: Account<'info, PromptAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 

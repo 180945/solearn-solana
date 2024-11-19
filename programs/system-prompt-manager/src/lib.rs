@@ -11,6 +11,7 @@ use anchor_spl::metadata::{
     create_master_edition_v3, create_metadata_accounts_v3, CreateMasterEditionV3, CreateMetadataAccountsV3
 };
 use solearn_solana::cpi::accounts::InferVld;
+use anchor_spl::token::{self, Transfer};
 
 declare_id!("nuvdhmYq5Z2Eg4nBi29Tu2VcbpE9nuiCQ68rkyAB3A1");
 
@@ -245,9 +246,24 @@ pub mod nft_program {
     pub fn infer_request(ctx: Context<SytemInfer>, input: Vec<u8>, creator: Pubkey, _value: u64, inference_id: u64,) -> Result<()> {
         msg!("Instruction: Infer Request");
 
-        // transfer fee to agent owner
-        
         // append infer request
+        let infer_data = ctx.accounts.promt_account.data.clone().into_iter().chain(input.clone().into_iter()).collect::<Vec<u8>>();
+
+        // extract and transfer fee to agent owner
+        if ctx.accounts.promt_account.fee > _value {
+            return Err(SystemPromptManagerError::InsufficientFunds.into());
+        }
+
+        let infer_value = _value - ctx.accounts.promt_account.fee;
+
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.inferer_token_account.to_account_info(),
+            to: ctx.accounts.agent_token_account.to_account_info(),
+            authority: ctx.accounts.signer.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        token::transfer(cpi_ctx, ctx.accounts.promt_account.fee)?;
 
         // call infer to workerhub
         let cpi_program = ctx.accounts.solearn_program.to_account_info();
@@ -262,7 +278,7 @@ pub mod nft_program {
             vault_wallet_owner_pda: ctx.accounts.vault_wallet_owner_pda.to_account_info(), // Add missing field
         };
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        solearn_solana::cpi::infer(cpi_ctx, input, creator, _value, inference_id)?;
+        solearn_solana::cpi::infer(cpi_ctx, infer_data, creator, infer_value, inference_id)?;
         
 
         Ok(())
