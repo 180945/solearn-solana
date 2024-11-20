@@ -28,14 +28,9 @@ pub struct Initialize<'info> {
     )]
     pub models: Account<'info, Models>,
     #[account(
-        init, 
-        // realloc = 8 + wh_account.len(),
-        // realloc::payer = admin, 
-        // realloc::zero = false,
+        init,
         payer = admin, 
         space = 8 + WorkerHubStorage::LEN,
-        seeds = [b"worker_hub_storage", sol_learn_account.key().as_ref()], 
-        bump
     )]
     pub sol_learn_account: Account<'info, WorkerHubStorage>,
     pub system_program: Program<'info, System>,

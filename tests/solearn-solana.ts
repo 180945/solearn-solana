@@ -55,7 +55,7 @@ describe("solearn-solana", () => {
       tokenProgram: TOKEN_PROGRAM,
     };
 
-    const [alice, bob, tokenMintA, tokenMintB] = makeKeypairs(4);
+    const [alice, bob, tokenMintA, tokenMintB, solearnAccount] = makeKeypairs(5);
 
     before('Creates Alice and Bob accounts, 2 token mints, and associated token accounts for both tokens for both users', async () => {
       const [aliceTokenAccountA, aliceTokenAccountB, bobTokenAccountA, bobTokenAccountB] = [alice, bob].flatMap((keypair) =>
@@ -108,16 +108,28 @@ describe("solearn-solana", () => {
       await provider.sendAndConfirm(tx, [tokenMintA, tokenMintB, alice, bob]);
   
       accounts.admin = alice.publicKey;
+      accounts.staking_token =  tokenMintA.publicKey;
+
+
+    //   #[account(
+    //     init, 
+    //     // realloc = 8 + wh_account.len(),
+    //     // realloc::payer = admin, 
+    //     // realloc::zero = false,
+    //     payer = admin, 
+    //     space = 8 + WorkerHubStorage::LEN,
+    //     seeds = [b"worker_hub_storage", sol_learn_account.key().as_ref()], 
+    //     bump
+    // )]
+    // pub sol_learn_account: Account<'info, WorkerHubStorage>,
+
+      // const offer = PublicKey.findProgramAddressSync(
+      //   [Buffer.from('vault'), accounts.maker.toBuffer(), offerId.toArrayLike(Buffer, 'le', 8)],
+      //   program.programId,
+      // )[0];
+
 
       // deploy solearn contract
-      // init pda to store list of models
-      // #[derive(Accounts)]
-      // pub struct Initialize<'info> {
-      //     #[account(mut)]
-      //     pub admin: Signer<'info>,
-      //     // #[account(init, payer = admin, space = 8 + SolLearnInfo::LEN)]
-      //     // pub sol_learn_account: Account<'info, SolLearnInfo>,
-      //     pub staking_token: InterfaceAccount<'info, Mint>,
       //     #[account(
       //         init, 
       //         payer = admin, 
@@ -151,11 +163,7 @@ describe("solearn-solana", () => {
       
 
       // Then determine the account addresses we'll use for the offer and the vault
-      // const offer = PublicKey.findProgramAddressSync(
-      //   [Buffer.from('offer'), accounts.maker.toBuffer(), offerId.toArrayLike(Buffer, 'le', 8)],
-      //   program.programId,
-      // )[0];
-
+  
       // 
 
 
