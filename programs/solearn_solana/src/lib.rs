@@ -17,7 +17,30 @@ declare_id!("7MHr6ZPGTWZkRk6m52GfEWoMxSV7EoDjYyoXAYf3MBwS");
 pub mod solearn {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, min_stake: u64, reward_per_epoch: u64, epoch_duration: u64) -> Result<()> {
+    pub fn initialize(
+        ctx: Context<Initialize>,
+        min_stake: u64,
+        reward_per_epoch: u64,
+        epoch_duration: u64,
+        miner_minimum_stake: u64,
+        treasury_address: Pubkey,
+        fee_l2_percentage: u16,
+        fee_treasury_percentage: u16,
+        fee_ratio_miner_validator: u16,
+        submit_duration: u64,
+        commit_duration: u64,
+        reveal_duration: u64,
+        penalty_duration: u64,
+        miner_requirement: u8,
+        blocks_per_epoch: u64,
+        fine_percentage: u16,
+        dao_token_reward: u64,
+        miner_percentage: u16,
+        user_percentage: u16,
+        referrer_percentage: u16,
+        referee_percentage: u16,
+        l2_owner_percentage: u16,
+    ) -> Result<()> {
         msg!("Instruction: Initialize");
 
         let sol_learn_account = &mut ctx.accounts.sol_learn_account;
@@ -32,6 +55,28 @@ pub mod solearn {
         sol_learn_account.epoch_duration = epoch_duration;
         sol_learn_account.last_epoch = 0;
         sol_learn_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+        sol_learn_account.inference_number = 0;
+        sol_learn_account.assignment_number = 0;
+        sol_learn_account.l2_owner = ctx.accounts.admin.key();
+        sol_learn_account.treasury = treasury_address;
+        sol_learn_account.last_block = Clock::get()?.slot;
+        sol_learn_account.fee_l2_percentage = fee_l2_percentage;
+        sol_learn_account.fee_treasury_percentage = fee_treasury_percentage;
+        sol_learn_account.miner_minimum_stake = miner_minimum_stake;
+        sol_learn_account.fee_ratio_miner_validator = fee_ratio_miner_validator;
+        sol_learn_account.submit_duration = submit_duration;
+        sol_learn_account.commit_duration = commit_duration;
+        sol_learn_account.reveal_duration = reveal_duration;
+        sol_learn_account.penalty_duration = penalty_duration;
+        sol_learn_account.miner_requirement = miner_requirement;
+        sol_learn_account.blocks_per_epoch = blocks_per_epoch;
+        sol_learn_account.fine_percentage = fine_percentage;
+        sol_learn_account.dao_token_reward = dao_token_reward;
+        sol_learn_account.dao_token_percentage.miner_percentage = miner_percentage;
+        sol_learn_account.dao_token_percentage.user_percentage = user_percentage;
+        sol_learn_account.dao_token_percentage.referrer_percentage = referrer_percentage;
+        sol_learn_account.dao_token_percentage.referee_percentage = referee_percentage;
+        sol_learn_account.dao_token_percentage.l2_owner_percentage = l2_owner_percentage;
 
         // vault account
         ctx.accounts.vault_wallet_owner.bump = ctx.bumps.vault_wallet_owner;
@@ -41,11 +86,7 @@ pub mod solearn {
         ctx.accounts.models.bump = ctx.bumps.models;
         msg!("models PDA bump seed: {}", ctx.bumps.models);
 
-        let acc = &mut ctx.accounts.wh_account;
-        acc.inference_number = 0;
-        acc.assignment_number = 0;
-        acc.current_epoch = 0;
-        // TODO
+        
 
         Ok(())
     }
@@ -101,9 +142,12 @@ pub mod solearn {
         msg!("Instruction: Join For Minting");
 
         // update epoch section
-        let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64) - ctx.accounts.sol_learn_account.last_time) / ctx.accounts.sol_learn_account.epoch_duration;
+        let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64)
+            - ctx.accounts.sol_learn_account.last_time)
+            / ctx.accounts.sol_learn_account.epoch_duration;
         if n > 0 {
-            ctx.accounts.sol_learn_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+            ctx.accounts.sol_learn_account.last_time =
+                ctx.accounts.sysvar_clock.unix_timestamp as u64;
             ctx.accounts.sol_learn_account.last_epoch += n;
         }
 
@@ -134,7 +178,7 @@ pub mod solearn {
             .extend_from_slice(ctx.accounts.miner.key().as_ref());
 
         // update miner join epoch time
-        ctx.accounts.miner_account.last_epoch = ctx.accounts.sol_learn_account.last_epoch;        
+        ctx.accounts.miner_account.last_epoch = ctx.accounts.sol_learn_account.last_epoch;
         ctx.accounts.miner_account.is_active = true;
         ctx.accounts.miner_account.model_index = (miners_of_model.data.len() / 32 + 1) as u64;
 
@@ -180,9 +224,12 @@ pub mod solearn {
         msg!("Instruction: Miner unregister");
 
         // update epoch section
-        let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64) - ctx.accounts.sol_learn_account.last_time) / ctx.accounts.sol_learn_account.epoch_duration;
+        let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64)
+            - ctx.accounts.sol_learn_account.last_time)
+            / ctx.accounts.sol_learn_account.epoch_duration;
         if n > 0 {
-            ctx.accounts.sol_learn_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+            ctx.accounts.sol_learn_account.last_time =
+                ctx.accounts.sysvar_clock.unix_timestamp as u64;
             ctx.accounts.sol_learn_account.last_epoch += n;
         }
 
@@ -200,7 +247,9 @@ pub mod solearn {
             + ctx.accounts.sol_learn_account.unstake_delay_time;
         if ctx.accounts.miner_account.is_active {
             ctx.accounts.miner_account.is_active = false;
-            ctx.accounts.miner_account.reward += (ctx.accounts.sol_learn_account.last_epoch - ctx.accounts.miner_account.last_epoch) * ctx.accounts.sol_learn_account.reward_per_epoch;
+            ctx.accounts.miner_account.reward += (ctx.accounts.sol_learn_account.last_epoch
+                - ctx.accounts.miner_account.last_epoch)
+                * ctx.accounts.sol_learn_account.reward_per_epoch;
         }
 
         // remove from MinersOfModel
@@ -225,9 +274,8 @@ pub mod solearn {
         Ok(())
     }
 
-    // claim unstaking amount 
+    // claim unstaking amount
     pub fn miner_claim_unstaked(ctx: Context<MinerClaim>) -> Result<()> {
-        
         if ctx.accounts.miner_account.is_active {
             return Err(SolLearnError::Activated.into());
         }
@@ -250,7 +298,9 @@ pub mod solearn {
         let decimals = ctx.accounts.staking_token.decimals;
         let solean_key = ctx.accounts.sol_learn_account.key().clone();
         let seeds = &[
-            "vault".as_bytes(), solean_key.as_ref(), &[ctx.accounts.vault_wallet_owner_pda.bump],
+            "vault".as_bytes(),
+            solean_key.as_ref(),
+            &[ctx.accounts.vault_wallet_owner_pda.bump],
         ];
 
         let signer_seeds = &[&seeds[..]];
@@ -276,30 +326,37 @@ pub mod solearn {
 
     // claim reward
     pub fn miner_claim_reward(ctx: Context<MinerClaimReward>) -> Result<()> {
-        
         // update epoch section
-        let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64) - ctx.accounts.sol_learn_account.last_time) / ctx.accounts.sol_learn_account.epoch_duration;
+        let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64)
+            - ctx.accounts.sol_learn_account.last_time)
+            / ctx.accounts.sol_learn_account.epoch_duration;
         if n > 0 {
-            ctx.accounts.sol_learn_account.last_time = ctx.accounts.sysvar_clock.unix_timestamp as u64;
+            ctx.accounts.sol_learn_account.last_time =
+                ctx.accounts.sysvar_clock.unix_timestamp as u64;
             ctx.accounts.sol_learn_account.last_epoch += n;
         }
 
-        let mut reward = 0 ;
+        let mut reward = 0;
         if ctx.accounts.miner_account.is_active {
             // udpate latest reward
-            let reward = ctx.accounts.miner_account.reward + (ctx.accounts.sol_learn_account.last_epoch - ctx.accounts.miner_account.last_epoch) * ctx.accounts.sol_learn_account.reward_per_epoch;
+            let reward = ctx.accounts.miner_account.reward
+                + (ctx.accounts.sol_learn_account.last_epoch
+                    - ctx.accounts.miner_account.last_epoch)
+                    * ctx.accounts.sol_learn_account.reward_per_epoch;
             if reward == 0 {
-                return Err(SolLearnError::NothingToClaim.into())
+                return Err(SolLearnError::NothingToClaim.into());
             }
 
             ctx.accounts.miner_account.last_epoch = ctx.accounts.sol_learn_account.last_epoch;
         }
 
-        // this used for unstaking 
+        // this used for unstaking
         let decimals = ctx.accounts.staking_token.decimals;
         let solean_key = ctx.accounts.sol_learn_account.key().clone();
         let seeds = &[
-            "vault".as_bytes(), solean_key.as_ref(), &[ctx.accounts.vault_wallet_owner_pda.bump],
+            "vault".as_bytes(),
+            solean_key.as_ref(),
+            &[ctx.accounts.vault_wallet_owner_pda.bump],
         ];
 
         let signer_seeds = &[&seeds[..]];
@@ -309,13 +366,13 @@ pub mod solearn {
             from: ctx.accounts.miner_staking_wallet.to_account_info(),
             to: ctx.accounts.vault_staking_wallet.to_account_info(),
             authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
-            mint: ctx.accounts.staking_token.clone().to_account_info()
+            mint: ctx.accounts.staking_token.clone().to_account_info(),
         };
 
         let ctx_transfer_token = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             cpi_accounts,
-            signer_seeds
+            signer_seeds,
         );
 
         transfer_checked(ctx_transfer_token, reward, decimals)?;
@@ -358,7 +415,6 @@ pub mod solearn {
         Ok(())
     }
 
-    
     // epoch update
     // set fine percentage
     // setPenaltyDuration
@@ -383,7 +439,7 @@ pub mod solearn {
 
     pub fn next_epoch_id(ctx: Context<ReadStateVld>) -> Result<u64> {
         let acc = &ctx.accounts.wh_account;
-        Ok(acc.current_epoch)
+        Ok(acc.last_epoch + 1)
     }
 
     pub fn update_epoch(ctx: Context<UpdateEpochVld>, epoch_id: u64) -> Result<()> {
@@ -392,7 +448,7 @@ pub mod solearn {
         let slot_number = Clock::get()?.slot;
         let epoch_passed = (slot_number - acc.last_block) / acc.blocks_per_epoch;
         if epoch_passed > 0 {
-            if epoch_id > acc.current_epoch {
+            if epoch_id > acc.last_epoch {
                 return Err(SolLearnError::InvalidEpochId.into());
             }
 
@@ -401,9 +457,9 @@ pub mod solearn {
                 (acc.reward_per_epoch * acc.blocks_per_epoch) / BLOCK_PER_YEAR;
 
             let ms = &mut ctx.accounts.miner_reward;
-            ms.total_miner = acc.miner_addresses.values.len() as u64;
+            ms.total_miner = acc.total_miner;
             ms.epoch_reward = reward_in_current_epoch;
-            acc.current_epoch += 1;
+            acc.last_epoch += 1;
             Ok(())
         } else {
             return Err(SolLearnError::EpochRewardUpToDate.into());
@@ -416,9 +472,12 @@ pub mod solearn {
         creator: Pubkey,
         _value: u64,
         inference_id: u64,
+        model: Pubkey,
     ) -> Result<u64> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         let model = &mut ctx.accounts.models;
+        let miners_of_model = &mut ctx.accounts.miners_of_model;
+        let miners_len = miners_of_model.data.len() / 32;
         if model.tier == 0 {
             return Err(SolLearnError::Unauthorized.into());
         }
@@ -427,13 +486,23 @@ pub mod solearn {
 
         let scoring_fee = validate_enough_fee_to_use(model.minimum_fee, _value)?;
 
-        let from = ctx.accounts.signer.to_account_info();
-        let to = ctx.accounts.vault_wallet_owner_pda.to_account_info();
-        if **from.try_borrow_lamports()? < _value {
-            return Err(SolLearnError::InsufficientFunds.into());
-        }
-        **from.try_borrow_mut_lamports()? -= _value;
-        **to.try_borrow_mut_lamports()? += _value;
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.miner_staking_wallet.to_account_info(),
+            to: ctx.accounts.vault_staking_wallet.to_account_info(),
+            authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        token::transfer(cpi_ctx, _value)?;
+
+        // let from = ctx.accounts.signer.to_account_info();
+        // let to = ctx.accounts.vault_wallet_owner_pda.to_account_info();
+        // if **from.try_borrow_lamports()? < _value {
+        //     return Err(SolLearnError::InsufficientFunds.into());
+        // }
+        // **from.try_borrow_mut_lamports()? -= _value;
+        // **to.try_borrow_mut_lamports()? += _value;
+
         let value = _value - scoring_fee;
 
         acc.inference_number += 1;
@@ -464,12 +533,6 @@ pub mod solearn {
         inference.reveal_timeout = commit_timeout + acc.reveal_duration;
         inference.status = 1;
 
-        // let model = inference.model_address;
-        let miner_addresses = &mut ctx.accounts.miner_addresses;
-        if miner_addresses.values.len() == 0 {
-            return Err(SolLearnError::NoMinerAvailable.into());
-        }
-
         let n = acc.miner_requirement;
         let mut selected_miners = Vec::with_capacity(n as usize);
         let tasks = &mut ctx.accounts.tasks;
@@ -481,13 +544,13 @@ pub mod solearn {
             let rand_uint = random_number(
                 &&Clock::get()?,
                 i.into(),
-                miner_addresses.values.len() as u64,
+                miners_len as u64,
             );
 
-            let miner_ind = (rand_uint as usize) % miner_addresses.values.len();
-            let miner = miner_addresses.values[miner_ind];
-            // let assignment = &mut ctx.accounts.assignment;
-            miner_addresses.values.remove(miner_ind);
+            let miner_ind = (rand_uint as usize) % miners_len;
+            let miner_bytes = miners_of_model.data.drain(miner_ind*32..(miner_ind+1)*32).collect::<Vec<u8>>();
+            let miner = Pubkey::new_from_array(miner_bytes.try_into().unwrap());
+
             let assignment_id = acc.assignment_number;
             acc.assignment_number += 1;
             let mut data = vec![];
@@ -503,8 +566,7 @@ pub mod solearn {
         }
 
         for miner in selected_miners {
-            let current_len = miner_addresses.values.len();
-            miner_addresses.values.insert(current_len, miner);
+            miners_of_model.data.extend_from_slice(miner.to_bytes().as_ref());
         }
         emit!(NewInference {
             inference_id,
@@ -551,7 +613,6 @@ pub mod solearn {
             worker,
         });
 
-
         Ok(())
     }
 
@@ -560,13 +621,22 @@ pub mod solearn {
             return Err(SolLearnError::ZeroValue.into());
         }
 
-        let from = ctx.accounts.signer.to_account_info();
-        let to = ctx.accounts.vault_wallet_owner_pda.to_account_info();
-        if **from.try_borrow_lamports()? < value {
-            return Err(SolLearnError::InsufficientFunds.into());
-        }
-        **from.try_borrow_mut_lamports()? -= value;
-        **to.try_borrow_mut_lamports()? += value;
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.miner_staking_wallet.to_account_info(),
+            to: ctx.accounts.vault_staking_wallet.to_account_info(),
+            authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        token::transfer(cpi_ctx, value)?;
+
+        // let from = ctx.accounts.signer.to_account_info();
+        // let to = ctx.accounts.vault_wallet_owner_pda.to_account_info();
+        // if **from.try_borrow_lamports()? < value {
+        //     return Err(SolLearnError::InsufficientFunds.into());
+        // }
+        // **from.try_borrow_mut_lamports()? -= value;
+        // **to.try_borrow_mut_lamports()? += value;
 
         let inference = &mut ctx.accounts.infs;
         if inference_id != inference.id {
@@ -582,7 +652,6 @@ pub mod solearn {
             creator: ctx.accounts.signer.key(),
             value,
         });
-
 
         Ok(())
     }
@@ -819,7 +888,7 @@ pub mod solearn {
         let dao_receivers = &mut ctx.accounts.dao_receiver_infos;
         let voting_info = &mut ctx.accounts.voting_info;
 
-        if ctx.accounts.recipient.key() != inference.creator {
+        if ctx.accounts.token_recipient.key() != inference.creator {
             return Err(SolLearnError::WrongRecipient.into());
         }
 
@@ -840,13 +909,22 @@ pub mod solearn {
                 inference.status = 5;
 
                 let value = inference.value + inference.fee_l2 + inference.fee_treasury;
-                let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
-                let to = ctx.accounts.recipient.to_account_info();
-                if **from.try_borrow_lamports()? < value {
-                    return Err(SolLearnError::InsufficientFunds.into());
-                }
-                **from.try_borrow_mut_lamports()? -= value;
-                **to.try_borrow_mut_lamports()? += value;
+                let cpi_accounts = Transfer {
+                    from: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+                    to: ctx.accounts.token_recipient.to_account_info(),
+                    authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+                };
+                let cpi_program = ctx.accounts.token_program.to_account_info();
+                let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+                token::transfer(cpi_ctx, value)?;
+
+                // let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
+                // let to = ctx.accounts.recipient.to_account_info();
+                // if **from.try_borrow_lamports()? < value {
+                //     return Err(SolLearnError::InsufficientFunds.into());
+                // }
+                // **from.try_borrow_mut_lamports()? -= value;
+                // **to.try_borrow_mut_lamports()? += value;
 
                 // _slash_miner(inference.processedMiner, true);
                 let tasks = &mut ctx.accounts.tasks;
@@ -863,13 +941,22 @@ pub mod solearn {
                 } else {
                     inference.status = 4;
                     let value = inference.value + inference.fee_l2 + inference.fee_treasury;
-                    let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
-                    let to = ctx.accounts.recipient.to_account_info();
-                    if **from.try_borrow_lamports()? < value {
-                        return Err(SolLearnError::InsufficientFunds.into());
-                    }
-                    **from.try_borrow_mut_lamports()? -= value;
-                    **to.try_borrow_mut_lamports()? += value;
+                    let cpi_accounts = Transfer {
+                        from: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+                        to: ctx.accounts.token_recipient.to_account_info(),
+                        authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+                    };
+                    let cpi_program = ctx.accounts.token_program.to_account_info();
+                    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+                    token::transfer(cpi_ctx, value)?;
+
+                    // let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
+                    // let to = ctx.accounts.recipient.to_account_info();
+                    // if **from.try_borrow_lamports()? < value {
+                    //     return Err(SolLearnError::InsufficientFunds.into());
+                    // }
+                    // **from.try_borrow_mut_lamports()? -= value;
+                    // **to.try_borrow_mut_lamports()? += value;
 
                     for i in 0..inference.assignments.len() {
                         // _slash_miner(assignment.worker, false);
@@ -893,13 +980,22 @@ pub mod solearn {
                 if !filter_commitment(acc, inference, assignment, dao_receivers, tasks)? {
                     //  handle_not_enough_vote(ctx.accounts.infs.id);
                     let value = inference.value + inference.fee_l2 + inference.fee_treasury;
-                    let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
-                    let to = ctx.accounts.recipient.to_account_info();
-                    if **from.try_borrow_lamports()? < value {
-                        return Err(SolLearnError::InsufficientFunds.into());
-                    }
-                    **from.try_borrow_mut_lamports()? -= value;
-                    **to.try_borrow_mut_lamports()? += value;
+                    let cpi_accounts = Transfer {
+                        from: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+                        to: ctx.accounts.token_recipient.to_account_info(),
+                        authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+                    };
+                    let cpi_program = ctx.accounts.token_program.to_account_info();
+                    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+                    token::transfer(cpi_ctx, value)?;
+
+                    // let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
+                    // let to = ctx.accounts.recipient.to_account_info();
+                    // if **from.try_borrow_lamports()? < value {
+                    //     return Err(SolLearnError::InsufficientFunds.into());
+                    // }
+                    // **from.try_borrow_mut_lamports()? -= value;
+                    // **to.try_borrow_mut_lamports()? += value;
 
                     for i in 0..inference.assignments.len() {
                         let dig = inference.digests.values[i];
@@ -949,7 +1045,7 @@ pub mod solearn {
             let mut value_bytes = [0u8; 8];
             value_bytes.copy_from_slice(&data[9..17]);
             let v = u64::from_le_bytes(value_bytes);
-            if ctx.accounts.recipient.key() != pubkey {
+            if ctx.accounts.token_recipient.key() != pubkey {
                 return Err(SolLearnError::WrongRecipient.into());
             }
             let set_vote = data[16];
@@ -964,19 +1060,27 @@ pub mod solearn {
             let mut value_bytes = [0u8; 8];
             value_bytes.copy_from_slice(&data[33..41]);
             let v = u64::from_le_bytes(value_bytes);
-            if ctx.accounts.recipient.key() != pubkey {
+            if ctx.accounts.token_recipient.key() != pubkey {
                 return Err(SolLearnError::WrongRecipient.into());
             }
             v
         };
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+            to: ctx.accounts.token_recipient.to_account_info(),
+            authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        token::transfer(cpi_ctx, value)?;
 
-        let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
-        let to = ctx.accounts.recipient.to_account_info();
-        if **from.try_borrow_lamports()? < value {
-            return Err(SolLearnError::InsufficientFunds.into());
-        }
-        **from.try_borrow_mut_lamports()? -= value;
-        **to.try_borrow_mut_lamports()? += value;
+        // let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
+        // let to = ctx.accounts.recipient.to_account_info();
+        // if **from.try_borrow_lamports()? < value {
+        //     return Err(SolLearnError::InsufficientFunds.into());
+        // }
+        // **from.try_borrow_mut_lamports()? -= value;
+        // **to.try_borrow_mut_lamports()? += value;
 
         Ok(())
     }
@@ -993,7 +1097,7 @@ pub mod solearn {
             return Err(SolLearnError::Unauthorized.into());
         }
 
-        let miner_addresses = &mut ctx.accounts.miner_addresses;
+        let miner_addresses = &mut ctx.accounts.miners_of_model;
         let miner = &mut ctx.accounts.miner;
         if miner.miner != _miner {
             return Err(SolLearnError::Unauthorized.into());
@@ -1006,7 +1110,7 @@ pub mod solearn {
 
     pub fn slash_miner(ctx: Context<SlashMinerVld>, assignment_id: u64) -> Result<()> {
         let acc = &mut ctx.accounts.wh_account;
-        let miner_addresses = &mut ctx.accounts.miner_addresses;
+        let miner_addresses = &mut ctx.accounts.miners_of_model;
         let miner = &mut ctx.accounts.miner;
         let assignment = &mut ctx.accounts.assignment;
 
@@ -1139,18 +1243,17 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn set_dao_token(ctx: Context<UpdateParamsVld>, dao_token_address: Pubkey) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
-        only_updated_epoch(acc)?;
+    // pub fn set_dao_token(ctx: Context<UpdateParamsVld>, dao_token_address: Pubkey) -> Result<()> {
+    //     let acc = &mut ctx.accounts.wh_account;
+    //     only_updated_epoch(acc)?;
 
-        acc.dao_token = dao_token_address;
-        emit!(DaoTokenUpdated {
-            new_dao_token: dao_token_address,
-        });
+    //     acc.dao_token = dao_token_address;
+    //     emit!(DaoTokenUpdated {
+    //         new_dao_token: dao_token_address,
+    //     });
 
-
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     pub fn set_treasury_address(
         ctx: Context<UpdateParamsVld>,
@@ -1163,7 +1266,6 @@ pub mod solearn {
         emit!(TreasuryAddressUpdated {
             new_treasury: treasury_address,
         });
-
 
         Ok(())
     }
@@ -1179,7 +1281,6 @@ pub mod solearn {
         emit!(FeeRatioMinerValidatorUpdated {
             new_fee_ratio_miner_validator: new_ratio as u64,
         });
-
 
         Ok(())
     }

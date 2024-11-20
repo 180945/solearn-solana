@@ -12,7 +12,8 @@ pub struct CreateNFT<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(mut)]
-    pub payer: Signer<'info>,
+    pub payer: Signer<'info>,  
+    /// CHECK:  
     #[account( 
         init,
         payer = payer, 
@@ -214,7 +215,7 @@ pub struct SytemInfer<'info> {
     pub system_program: Program<'info, System>,
     /// CHECK:
     #[account(mut)]
-    pub wh_account: UncheckedAccount<'info>,
+    pub sol_learn_account: UncheckedAccount<'info>,
     /// CHECK:
     #[account(mut)]
     pub assignment: UncheckedAccount<'info>,
@@ -246,6 +247,14 @@ pub struct SytemInfer<'info> {
         associated_token::authority = signer,
     )]
     pub inferer_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub miner_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    /// CHECK:
+    #[account(mut)]
+    pub models: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub referrer: UncheckedAccount<'info>,
     /// init new promt account
     #[account( 
         seeds = ["promt".as_bytes(), 

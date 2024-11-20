@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-use crate::{MinerInfo, Models, SolLearnInfo, VaultAccount};
+use crate::{MinerInfo, MinersOfModel, Models, SolLearnInfo, VaultAccount};
 
 #[derive(Accounts)]
 pub struct UpdateParamsVld<'info> {
@@ -82,7 +82,7 @@ pub struct Referrer {
 }
 
 #[derive(Accounts)]
-#[instruction(inference_id: u64, creator: Pubkey)]
+#[instruction(inference_id: u64, creator: Pubkey, model: Pubkey)]
 pub struct InferVld<'info> {
     #[account(
         init,
@@ -90,9 +90,8 @@ pub struct InferVld<'info> {
         space = 8 + 2 + 4 + 2000 + 1, seeds = [b"inference", inference_id.to_le_bytes().as_ref()], bump
     )]
     pub infs: Account<'info, Inference>,
-    pub system_program: Program<'info, System>,
     #[account(init, payer = signer, space = 8 + 8)]
-    pub wh_account: Account<'info, WorkerHubStorage>,
+    pub sol_learn_account: Account<'info, WorkerHubStorage>,
     #[account(mut, seeds = [b"assignment", signer.key().as_ref()], bump = assignment.bump)]
     pub assignment: Account<'info, Assignment>,
     #[account(mut)]
@@ -104,20 +103,33 @@ pub struct InferVld<'info> {
 	#[account(mut, seeds = [b"referrer", creator.to_bytes().as_ref()], bump = referrer.bump)]
 	pub referrer: Account<'info, Referrer>,
     #[account(mut)]
+    pub miners_of_model: Account<'info, MinersOfModel>,
+    #[account(mut)]
     pub signer: Signer<'info>,
     #[account(mut)]
 	pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+    #[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner_pda.key())]
+    pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut)]
+    pub miner_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 #[instruction(inference_id: u64)]
 pub struct UpdateInferVld<'info> {
-    pub system_program: Program<'info, System>,
     #[account(mut)]
     pub infs: Account<'info, Inference>,
     pub signer: Signer<'info>,
     #[account(mut)]
-	pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+    pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+    #[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner_pda.key())]
+    pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut)]
+    pub miner_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
 }
 
 #[account]
@@ -239,6 +251,8 @@ pub struct SlashMinerByAdminVld<'info> {
     pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
     pub miner: Account<'info, MinerInfo>,
+    #[account(mut)]
+    pub miners_of_model: Account<'info, MinersOfModel>,
     /// CHECK:
     #[account(mut, constraint = sol_learn_account.admin == signer.key())]
     pub sol_learn_account: Account<'info, SolLearnInfo>,
@@ -257,16 +271,18 @@ pub struct CreateAssignmentVld<'info> {
 #[derive(Accounts)]
 #[instruction(assignment_id: u64)]
 pub struct PayMinerVld<'info> {
-	pub system_program: Program<'info, System>,
 	#[account(mut)]
 	pub tasks: Account<'info, Tasks>,
 	#[account(mut)]
     pub assignment: Account<'info, Assignment>,
-    /// CHECK
 	#[account(mut)]
-	pub recipient: UncheckedAccount<'info>,
-	#[account(mut)]
-	pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+    pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+    #[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner_pda.key())]
+    pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut)]
+    pub token_recipient: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -283,6 +299,8 @@ pub struct SlashMinerVld<'info> {
 	pub tasks: Account<'info, Tasks>,
 	#[account(mut)]
     pub assignment: Account<'info, Assignment>,
+    #[account(mut)]
+    pub miners_of_model: Account<'info, MinersOfModel>,
 	// #[account(mut)]
 	// pub signer: Signer<'info>,
 	#[account(mut)]
@@ -302,7 +320,6 @@ pub struct SlashMinerVld<'info> {
 #[derive(Accounts)]
 #[instruction(assignment_id: u64)]
 pub struct UpdateAssignmentVld<'info> {
-	pub system_program: Program<'info, System>,
     #[account(mut)]
     pub wh_account: Account<'info, WorkerHubStorage>,
     #[account(mut)]
@@ -319,14 +336,17 @@ pub struct UpdateAssignmentVld<'info> {
     pub voting_info: Account<'info, VotingInfo>,
     #[account(mut)]
 	pub tasks: Account<'info, Tasks>,
-    #[account(mut)]
-	pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
-	/// CHECK
-    #[account(mut)]
-    pub recipient: UncheckedAccount<'info>,
     #[account(mut, seeds = [b"dao_receivers_info", signer.key().as_ref()], bump = dao_receiver_infos.bump)]
     pub dao_receiver_infos: Account<'info, DAOTokenReceiverInfos>,
     pub signer: Signer<'info>,
+    #[account(mut)]
+    pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
+    #[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner_pda.key())]
+    pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut)]
+    pub token_recipient: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -349,69 +369,59 @@ pub struct UpdateTaskVld<'info> {
 }
 
 
-#[account]
-pub struct WorkerHubStorage {
-    // pub models: Vec<Models>,
-    pub miner_addresses: Pubkeys,
-    pub inference_number: u64,
-    pub assignment_number: u64,
-    pub miner_minimum_stake: u64,
-    pub l2_owner: Pubkey,
-    pub treasury: Pubkey,
-    pub fee_l2_percentage: u16,
-    pub fee_treasury_percentage: u16,
-    pub fee_ratio_miner_validator: u16,
-    pub submit_duration: u64,
-    pub commit_duration: u64,
-    pub reveal_duration: u64,
-    pub penalty_duration: u64,
-    pub miner_requirement: u8,
-    pub blocks_per_epoch: u64,
-    pub last_block: u64,
-    pub current_epoch: u64,
-    pub reward_per_epoch: u64,
-    pub fine_percentage: u16,
-    pub dao_token: Pubkey,
-    pub dao_token_reward: u64,
-    pub dao_token_percentage: DAOTokenPercentage,
-    pub min_fee_to_use: u64,
-    // pub randomizer: Pubkey,
-    // pub miners: HashMap<Pubkey, Worker>,
-    // pub minerAddressesByModel: HashMap<Pubkey, Pubkeys>,
-    // pub modelAddresses: Pubkeys,
-    // pub minerUnstakeRequests: HashMap<Pubkey, UnstakeRequest>,
-    // pub inferences: HashMap<u64, Inference>,
-    // pub assignments: HashMap<u64, Assignment>,
-    // pub votingInfo: HashMap<u64, VotingInfo>,
-    // pub digests: HashMap<u64, Bytes32Set>,
-    // pub countDigest: HashMap<Bytes32, u8>,
-    // pub assignmentsByMiner: HashMap<Pubkey, Vec<u64>>,
-    // pub assignmentsByInference: HashMap<u64, Vec<u64>>,
-    // pub unstakeDelayTime: u64,
-    // pub maximumTier: u16,
-    // pub rewardPerEpoch: u64,
-    // pub minerRewards: HashMap<Pubkey, u64>,
-    // pub boost: HashMap<Pubkey, Boost>,
-    // pub isReferrer: HashMap<Pubkey, bool>,
-    // pub referrerOf: HashMap<Pubkey, Pubkey>,
-    // pub workerHubScoring: Pubkey,
-    // pub modelScoring: Pubkey,
-    // pub daoReceiversInfo: HashMap<u64, Vec<DAOTokenReceiverInfo>>,
-    // pub wEAI: Pubkey,
-}
+// #[account]
+// pub struct WorkerHubStorage {
+//     // pub models: Vec<Models>,
+//     pub miner_addresses: Pubkeys,
+//     pub inference_number: u64,
+//     pub assignment_number: u64,
+//     pub miner_minimum_stake: u64,
+//     pub l2_owner: Pubkey,
+//     pub treasury: Pubkey,
+//     pub fee_l2_percentage: u16,
+//     pub fee_treasury_percentage: u16,
+//     pub fee_ratio_miner_validator: u16,
+//     pub submit_duration: u64,
+//     pub commit_duration: u64,
+//     pub reveal_duration: u64,
+//     pub penalty_duration: u64,
+//     pub miner_requirement: u8,
+//     pub blocks_per_epoch: u64,
+//     pub last_block: u64,
+//     pub fine_percentage: u16,
+//     pub dao_token: Pubkey,
+//     pub dao_token_reward: u64,
+//     pub dao_token_percentage: DAOTokenPercentage,
 
-impl WorkerHubStorage {
-    pub const INIT_LEN: usize = 8 + 8 + 8 + 8 + 32 + 32 + 2 + 2 + 2 + 8 + 8 + 8 + 8
-        + 1 + 8 + 8 + 8 + 2 + 32 + 8
-        + 2 * 5
-        + 8 + 8;
-    pub fn len(&self) -> usize {
-        8 + 8 + 8 + 8 + 32 + 32 + 2 + 2 + 2 + 8 + 8 + 8 + 8
-        + 1 + 8 + 8 + 8 + 2 + 32 + 8
-        + 2 * 5
-        + 8 + self.miner_addresses.len()
-    }
-}
+//     // pub current_epoch: u64,
+//     // pub reward_per_epoch: u64,
+//     // pub min_fee_to_use: u64,
+//     // pub randomizer: Pubkey,
+//     // pub miners: HashMap<Pubkey, Worker>,
+//     // pub minerAddressesByModel: HashMap<Pubkey, Pubkeys>,
+//     // pub modelAddresses: Pubkeys,
+//     // pub minerUnstakeRequests: HashMap<Pubkey, UnstakeRequest>,
+//     // pub inferences: HashMap<u64, Inference>,
+//     // pub assignments: HashMap<u64, Assignment>,
+//     // pub votingInfo: HashMap<u64, VotingInfo>,
+//     // pub digests: HashMap<u64, Bytes32Set>,
+//     // pub countDigest: HashMap<Bytes32, u8>,
+//     // pub assignmentsByMiner: HashMap<Pubkey, Vec<u64>>,
+//     // pub assignmentsByInference: HashMap<u64, Vec<u64>>,
+//     // pub unstakeDelayTime: u64,
+//     // pub maximumTier: u16,
+//     // pub rewardPerEpoch: u64,
+//     // pub minerRewards: HashMap<Pubkey, u64>,
+//     // pub boost: HashMap<Pubkey, Boost>,
+//     // pub isReferrer: HashMap<Pubkey, bool>,
+//     // pub referrerOf: HashMap<Pubkey, Pubkey>,
+//     // pub workerHubScoring: Pubkey,
+//     // pub modelScoring: Pubkey,
+//     // pub daoReceiversInfo: HashMap<u64, Vec<DAOTokenReceiverInfo>>,
+//     // pub wEAI: Pubkey,
+// }
+
+pub type WorkerHubStorage = SolLearnInfo;
 
 pub enum FnType {
 	CreateAssignment,

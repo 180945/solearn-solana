@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::errors::*;
 use crate::state_inf::*;
 use crate::MinerInfo;
+use crate::MinersOfModel;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak::hash;
 
@@ -55,21 +56,24 @@ pub fn _slash_miner(
     miner: &mut MinerInfo,
     is_fined: bool,
     acc: &mut WorkerHubStorage,
-    miner_addresses: &mut Pubkeys,
+    miner_addresses: &mut MinersOfModel,
 ) -> Result<u64> {
-    if !acc.miner_addresses.values.contains(&miner.miner) {
-        return Err(SolLearnError::Unauthorized.into());
-    }
+    // if !acc.miner_addresses.values.contains(&miner.miner) {
+    //     return Err(SolLearnError::Unauthorized.into());
+    // }
 
     // _claim_reward(miner, false);
     let mut remove_ind = 0;
-    for (i, m) in miner_addresses.values.iter().enumerate() {
-        if *m == miner.miner {
+    for i in 0..(miner_addresses.data.len()/32) {
+        let pubkey_bytes: [u8; 32] = miner_addresses.data[i*32..(i+1)*32].try_into().unwrap();
+        
+        if pubkey_bytes == miner.miner.to_bytes() {
             remove_ind = i;
             break;
         }
     }
-    miner_addresses.values.remove(remove_ind);
+    miner_addresses.data.drain(remove_ind*32..(remove_ind+1)*32);
+    
     miner.active_time = Clock::get()?.slot + acc.penalty_duration;
     emit!(MinerDeactivated {
         miner: miner.miner,

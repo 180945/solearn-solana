@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+
 use solearn_solana::program::Solearn;
 
 // init pda to store list of models
@@ -20,11 +22,64 @@ pub struct UpdateParamsVld<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(id_collection: u64, id_nft: u64)]
 pub struct CpiInferVld<'info> {
-    // #[account(mut)]
-    // pub model_storage: Account<'info, ModelStorage>,
-    pub callee: Program<'info, Solearn>,
+    /// CHECK:
+    #[account(mut)]
+    pub infs: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
+    /// CHECK:
+    #[account(mut)]
+    pub sol_learn_account: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub assignment: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub miner_addresses: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub tasks: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub vault_wallet_owner_pda: UncheckedAccount<'info>,
+    pub solearn_program: Program<'info, Solearn>,
+    #[account( 
+        seeds = ["mint".as_bytes(), 
+                id_collection.to_le_bytes().as_ref(),
+                id_nft.to_le_bytes().as_ref()], 
+        bump,
+    )]
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(mut)]
+    pub agent_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = signer,
+    )]
+    pub inferer_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub miner_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    pub vault_staking_wallet: InterfaceAccount<'info, TokenAccount>,
+    /// CHECK:
+    #[account(mut)]
+    pub models: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub referrer: UncheckedAccount<'info>,
+    /// init new promt account
+    // #[account( 
+    //     seeds = ["promt".as_bytes(), 
+    //             id_collection.to_le_bytes().as_ref(),
+    //             id_nft.to_le_bytes().as_ref(),
+    //             agent_token_account.key().as_ref()], 
+    //     bump = promt_account.bump,
+    // )]
+    // pub promt_account: Account<'info, PromptAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 #[account]

@@ -1,15 +1,15 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-use crate::WorkerHubStorage;
+use crate::{DAOTokenPercentage, Pubkeys, WorkerHubStorage};
 
 // init pda to store list of models
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
-    #[account(init, payer = admin, space = 8 + SolLearnInfo::LEN)]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    // #[account(init, payer = admin, space = 8 + SolLearnInfo::LEN)]
+    // pub sol_learn_account: Account<'info, SolLearnInfo>,
     pub staking_token: InterfaceAccount<'info, Mint>,
     #[account(
         init, 
@@ -33,11 +33,11 @@ pub struct Initialize<'info> {
         // realloc::payer = admin, 
         // realloc::zero = false,
         payer = admin, 
-        space = 8 + WorkerHubStorage::INIT_LEN,
+        space = 8 + WorkerHubStorage::LEN,
         seeds = [b"worker_hub_storage", sol_learn_account.key().as_ref()], 
         bump
     )]
-    pub wh_account: Account<'info, WorkerHubStorage>,
+    pub sol_learn_account: Account<'info, WorkerHubStorage>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
 }
@@ -279,14 +279,34 @@ pub struct SolLearnInfo {
     pub miner_min_stake: u64,
     pub unstake_delay_time: u64,
     pub reward_per_epoch: u64,
-    pub mine_fee_to_use: u64,
+    pub min_fee_to_use: u64,
     pub last_epoch: u64,
     pub epoch_duration: u64,
     pub last_time: u64,
+
+    pub inference_number: u64,
+    pub assignment_number: u64,
+    pub miner_minimum_stake: u64,
+    pub l2_owner: Pubkey,
+    pub treasury: Pubkey,
+    pub fee_l2_percentage: u16,
+    pub fee_treasury_percentage: u16,
+    pub fee_ratio_miner_validator: u16,
+    pub submit_duration: u64,
+    pub commit_duration: u64,
+    pub reveal_duration: u64,
+    pub penalty_duration: u64,
+    pub miner_requirement: u8,
+    pub blocks_per_epoch: u64,
+    pub last_block: u64,
+    pub fine_percentage: u16,
+    pub dao_token_reward: u64,
+    pub dao_token_percentage: DAOTokenPercentage,
 }
 
 impl SolLearnInfo {
-    pub const LEN: usize = 32 + 32 + 8 * 10;
+    pub const LEN: usize = 32 + 32 + 8 * 10
+            + 8 * 11 + 1 + 2 * 10 + 32 * 2;
 }
 
 #[account]
