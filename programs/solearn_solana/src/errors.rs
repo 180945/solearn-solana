@@ -50,4 +50,6 @@ pub enum SolLearnError {
     EpochRewardUpToDate,
     #[msg("Insufficient funds")]
     InsufficientFunds,
+    #[msg("Invalid token")]
+    InvalidToken,
 }

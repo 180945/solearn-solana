@@ -106,6 +106,10 @@ pub mod solearn {
             return Err(SolLearnError::NoModelRegistered.into());
         }
 
+        if ctx.accounts.sol_learn_account.token != ctx.accounts.staking_token.key() {
+            return Err(SolLearnError::InvalidToken.into());
+        }
+
         // get random value
         let model_index = random_number(
             &&Clock::get()?,
@@ -198,6 +202,10 @@ pub mod solearn {
     pub fn topup(ctx: Context<Topup>, topup_amount: u64) -> Result<()> {
         msg!("Instruction: Top up staking amount");
 
+        if ctx.accounts.sol_learn_account.token != ctx.accounts.staking_token.key() {
+            return Err(SolLearnError::InvalidToken.into());
+        }
+
         let miner_info = &mut ctx.accounts.miner_info;
         miner_info.stake_amount += topup_amount;
 
@@ -276,6 +284,10 @@ pub mod solearn {
 
     // claim unstaking amount
     pub fn miner_claim_unstaked(ctx: Context<MinerClaim>) -> Result<()> {
+        if ctx.accounts.sol_learn_account.token != ctx.accounts.staking_token.key() {
+            return Err(SolLearnError::InvalidToken.into());
+        }
+
         if ctx.accounts.miner_account.is_active {
             return Err(SolLearnError::Activated.into());
         }
@@ -326,6 +338,10 @@ pub mod solearn {
 
     // claim reward
     pub fn miner_claim_reward(ctx: Context<MinerClaimReward>) -> Result<()> {
+        if ctx.accounts.sol_learn_account.token != ctx.accounts.staking_token.key() {
+            return Err(SolLearnError::InvalidToken.into());
+        }
+
         // update epoch section
         let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64)
             - ctx.accounts.sol_learn_account.last_time)
