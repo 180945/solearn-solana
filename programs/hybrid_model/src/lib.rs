@@ -11,7 +11,7 @@ use errors::*;
 use state::*;
 use utils::*;
 
-declare_id!("7MHr6ZPGTWZkRk6m52GfEWoMxSV7EoDjYyoXAYf3MBwS");
+declare_id!("GJDRVDToZqT6ZQZ74TreUqm4tvR8yYhUcMwYKMHucoen");
 
 #[program]
 pub mod hybrid_model {

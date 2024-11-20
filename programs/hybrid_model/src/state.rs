@@ -5,10 +5,17 @@ use solearn_solana::program::Solearn;
 
 // init pda to store list of models
 #[derive(Accounts)]
+#[instruction(identifier: u64)]
 pub struct Initialize<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
-    #[account(mut)]
+    #[account(
+        init,
+        space = ModelStorage::LEN,
+        payer = admin,
+        seeds = ["model_storage".as_bytes(), identifier.to_le_bytes().as_ref()],
+        bump,
+    )]
     pub model_storage: Account<'info, ModelStorage>,
     pub system_program: Program<'info, System>,
 }
@@ -92,6 +99,11 @@ pub struct ModelStorage {
     pub admin: Pubkey,
     pub bump: u8,
 }
+
+impl ModelStorage {
+    pub const LEN: usize = 8 + 64 + 256 + 32 + 32 + 32 + 1;
+}
+
 
 #[event]
 pub struct WorkerHubUpdate {
