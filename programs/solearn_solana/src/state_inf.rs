@@ -375,7 +375,7 @@ pub struct UpdateTaskVld<'info> {
 //     pub miner_addresses: Pubkeys,
 //     pub inference_number: u64,
 //     pub assignment_number: u64,
-//     pub miner_minimum_stake: u64,
+//     pub miner_min_stake: u64,
 //     pub l2_owner: Pubkey,
 //     pub treasury: Pubkey,
 //     pub fee_l2_percentage: u16,

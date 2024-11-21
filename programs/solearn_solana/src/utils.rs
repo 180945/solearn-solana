@@ -84,7 +84,7 @@ pub fn _slash_miner(
 
 
     if is_fined {
-        let fine = (acc.miner_minimum_stake * acc.fine_percentage as u64) / PERCENTAGE_DENOMINATOR;
+        let fine = (acc.miner_min_stake * acc.fine_percentage as u64) / PERCENTAGE_DENOMINATOR;
         if miner.stake_amount < fine {
             miner.stake_amount = 0;
         } else {

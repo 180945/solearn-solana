@@ -11,7 +11,7 @@ use state::*;
 use state_inf::*;
 use utils::*;
 
-declare_id!("7MHr6ZPGTWZkRk6m52GfEWoMxSV7EoDjYyoXAYf3MBwS");
+declare_id!("8fXqHtGHRwr7Mdif7HJhsV66qwSWLnozjabo2uEHPFZ1");
 
 #[program]
 pub mod solearn {
@@ -22,7 +22,6 @@ pub mod solearn {
         min_stake: u64,
         reward_per_epoch: u64,
         epoch_duration: u64,
-        miner_minimum_stake: u64,
         treasury_address: Pubkey,
         fee_l2_percentage: u16,
         fee_treasury_percentage: u16,
@@ -62,7 +61,6 @@ pub mod solearn {
         sol_learn_account.last_block = Clock::get()?.slot;
         sol_learn_account.fee_l2_percentage = fee_l2_percentage;
         sol_learn_account.fee_treasury_percentage = fee_treasury_percentage;
-        sol_learn_account.miner_minimum_stake = miner_minimum_stake;
         sol_learn_account.fee_ratio_miner_validator = fee_ratio_miner_validator;
         sol_learn_account.submit_duration = submit_duration;
         sol_learn_account.commit_duration = commit_duration;
@@ -421,9 +419,9 @@ pub mod solearn {
     // setMinFeeToUse
     // setNewRewardInEpoch
 
-    pub fn set_miner_minimum_stake(ctx: Context<UpdateParamsVld>, data: u64) -> Result<()> {
+    pub fn set_miner_min_stake(ctx: Context<UpdateParamsVld>, data: u64) -> Result<()> {
         let acc = &mut ctx.accounts.wh_account;
-        acc.miner_minimum_stake = data.into();
+        acc.miner_min_stake = data.into();
         Ok(())
     }
 

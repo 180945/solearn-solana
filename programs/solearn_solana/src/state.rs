@@ -34,8 +34,6 @@ pub struct Initialize<'info> {
         // realloc::zero = false,
         payer = admin, 
         space = 8 + WorkerHubStorage::LEN,
-        seeds = [b"worker_hub_storage", sol_learn_account.key().as_ref()], 
-        bump
     )]
     pub sol_learn_account: Account<'info, WorkerHubStorage>,
     pub system_program: Program<'info, System>,
@@ -286,7 +284,6 @@ pub struct SolLearnInfo {
 
     pub inference_number: u64,
     pub assignment_number: u64,
-    pub miner_minimum_stake: u64,
     pub l2_owner: Pubkey,
     pub treasury: Pubkey,
     pub fee_l2_percentage: u16,
