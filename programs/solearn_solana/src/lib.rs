@@ -19,9 +19,9 @@ pub mod solearn {
 
     pub fn initialize(
         ctx: Context<Initialize>,
-        min_stake: u64,
         reward_per_epoch: u64,
         epoch_duration: u64,
+        min_stake: u64,
         treasury_address: Pubkey,
         fee_l2_percentage: u16,
         fee_treasury_percentage: u16,
@@ -31,7 +31,7 @@ pub mod solearn {
         reveal_duration: u64,
         penalty_duration: u64,
         miner_requirement: u8,
-        blocks_per_epoch: u64,
+        blocks_per_epoch: u64, // todo: consider to remove this value, use epoch_duration instead
         fine_percentage: u16,
         dao_token_reward: u64,
         miner_percentage: u16,
@@ -49,7 +49,7 @@ pub mod solearn {
         sol_learn_account.total_miner = 0;
         sol_learn_account.total_models = 0;
         sol_learn_account.total_infer = 0;
-        sol_learn_account.miner_min_stake = min_stake;
+        sol_learn_account.miner_minimum_stake = min_stake;
         sol_learn_account.reward_per_epoch = reward_per_epoch;
         sol_learn_account.epoch_duration = epoch_duration;
         sol_learn_account.last_epoch = 0;
@@ -92,7 +92,7 @@ pub mod solearn {
     pub fn miner_register(ctx: Context<MinerRegister>, stake_amount: u64) -> Result<()> {
         msg!("Instruction: Miner register");
 
-        if ctx.accounts.sol_learn_account.miner_min_stake > stake_amount {
+        if ctx.accounts.sol_learn_account.miner_minimum_stake > stake_amount {
             return Err(SolLearnError::MustGreatThanMinStake.into());
         }
 
@@ -153,7 +153,7 @@ pub mod solearn {
             ctx.accounts.sol_learn_account.last_epoch += n;
         }
 
-        if ctx.accounts.sol_learn_account.miner_min_stake > ctx.accounts.miner_account.stake_amount
+        if ctx.accounts.sol_learn_account.miner_minimum_stake > ctx.accounts.miner_account.stake_amount
         {
             return Err(SolLearnError::MustGreatThanMinStake.into());
         }
@@ -226,7 +226,7 @@ pub mod solearn {
     }
 
     // unregister_miner
-    pub fn miner_unstaking(ctx: Context<MinerUnStaking>) -> Result<()> {
+    pub fn miner_unstake(ctx: Context<MinerUnStaking>) -> Result<()> {
         msg!("Instruction: Miner unregister");
 
         // update epoch section
@@ -437,7 +437,7 @@ pub mod solearn {
 
     pub fn set_miner_min_stake(ctx: Context<UpdateParamsVld>, data: u64) -> Result<()> {
         let acc = &mut ctx.accounts.wh_account;
-        acc.miner_min_stake = data.into();
+        acc.miner_minimum_stake = data.into();
         Ok(())
     }
 

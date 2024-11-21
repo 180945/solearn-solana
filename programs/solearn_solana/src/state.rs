@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-use crate::{DAOTokenPercentage, Pubkeys, WorkerHubStorage};
+use crate::{DAOTokenPercentage, WorkerHubStorage};
 
 // init pda to store list of models
 #[derive(Accounts)]
@@ -28,7 +28,10 @@ pub struct Initialize<'info> {
     )]
     pub models: Account<'info, Models>,
     #[account(
-        init,
+        init, 
+        // realloc = 8 + wh_account.len(),
+        // realloc::payer = admin, 
+        // realloc::zero = false,
         payer = admin, 
         space = 8 + WorkerHubStorage::LEN,
     )]
@@ -271,7 +274,7 @@ pub struct SolLearnInfo {
     pub total_miner: u64,
     pub total_models: u64,
     pub total_infer: u64,
-    pub miner_min_stake: u64,
+    pub miner_minimum_stake: u64,
     pub unstake_delay_time: u64,
     pub reward_per_epoch: u64,
     pub min_fee_to_use: u64,
