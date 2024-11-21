@@ -18,7 +18,7 @@ pub struct Initialize<'info> {
         seeds = [b"vault", sol_learn_account.key().as_ref()], 
         bump
     )]
-    pub vault_wallet_owner: Account<'info, VaultAccount>,
+    pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
     #[account(
         init, 
         payer = admin, 
@@ -47,7 +47,7 @@ pub struct AddModel<'info> {
     pub sol_learn_account: Account<'info, SolLearnInfo>,
     #[account(
         mut,
-        realloc = 8 + 1 + 4 + models.data.len() + 32,
+        realloc = 8 + Models::LEN + models.data.len() + 32,
         realloc::payer = admin,
         realloc::zero = false,
         seeds = [b"models", sol_learn_account.key().as_ref()], 
@@ -271,7 +271,6 @@ pub struct SolLearnInfo {
     pub total_miner: u64,
     pub total_models: u64,
     pub total_infer: u64,
-    pub miner_min_stake: u64,
     pub unstake_delay_time: u64,
     pub reward_per_epoch: u64,
     pub min_fee_to_use: u64,
@@ -319,7 +318,7 @@ pub struct MinerInfo {
 }
 
 impl MinerInfo {
-    pub const LEN: usize = 1 + 32 + 32 + 8 + 8 + 8 + 8 + 1 + 8;
+    pub const LEN: usize = 1 + 32 + 32 + 8 * 6 + 1;
 }
 
 #[account]
@@ -331,6 +330,8 @@ impl VaultAccount {
     pub const LEN: usize = 8;
 }
 
+// todo: review this again
+// models accounts's purpose is to contain only list of models
 #[account]
 pub struct Models {
     pub bump: u8, 
@@ -340,7 +341,7 @@ pub struct Models {
 }
 
 impl Models {
-    pub const LEN: usize = 1 + 4;
+    pub const LEN: usize = 1 + 4 + 8 + 4;
 }
 
 #[account]
