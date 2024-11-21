@@ -99,6 +99,7 @@ pub mod solearn {
         // set miner info
         let miner_account = &mut ctx.accounts.miner_account;
         miner_account.stake_amount = stake_amount;
+        miner_account.bump = ctx.bumps.miner_account;
 
         if ctx.accounts.models.data.len() == 0 {
             return Err(SolLearnError::NoModelRegistered.into());
@@ -227,7 +228,7 @@ pub mod solearn {
 
     // unregister_miner
     pub fn miner_unstake(ctx: Context<MinerUnStaking>) -> Result<()> {
-        msg!("Instruction: Miner unregister");
+        msg!("Instruction: Miner unstake");
 
         // update epoch section
         let n = ((ctx.accounts.sysvar_clock.unix_timestamp as u64)
@@ -239,12 +240,12 @@ pub mod solearn {
             ctx.accounts.sol_learn_account.last_epoch += n;
         }
 
-        if ctx.accounts.miner_account.model_index != 0 {
-            return Err(SolLearnError::MinerNotRegistered.into());
+        if ctx.accounts.miner_account.stake_amount == 0 {
+            return Err(SolLearnError::StakingZeroValue.into());
         }
 
         if ctx.accounts.miner_account.unstaking_time != 0 {
-            return Err(SolLearnError::Unstaked.into());
+            return Err(SolLearnError::Unstaking.into());
         }
 
         // update account unstaking time
@@ -258,23 +259,25 @@ pub mod solearn {
                 * ctx.accounts.sol_learn_account.reward_per_epoch;
         }
 
-        // remove from MinersOfModel
-        let miner_key = ctx.accounts.miner.key();
-        let mut data = ctx.accounts.miners_of_model.data.clone();
+        if ctx.accounts.miner_account.model_index != 0 {
+            // remove from MinersOfModel
+            let miner_key = ctx.accounts.miner.key();
+            let mut data = ctx.accounts.miners_of_model.data.clone();
 
-        // Find the index of the miner's key in the data
-        if let Some(index) = data
-            .chunks(32)
-            .position(|chunk| chunk == miner_key.as_ref())
-        {
-            // Remove the miner's key from the data
-            data.drain(index * 32..(index + 1) * 32);
+            // Find the index of the miner's key in the data
+            if let Some(index) = data
+                .chunks(32)
+                .position(|chunk| chunk == miner_key.as_ref())
+            {
+                // Remove the miner's key from the data
+                data.drain(index * 32..(index + 1) * 32);
 
-            // Update the account data
-            ctx.accounts.miners_of_model.data = data;
-            ctx.accounts.miner_account.model_index = 0;
-        } else {
-            return Err(SolLearnError::MinerNotRegistered.into());
+                // Update the account data
+                ctx.accounts.miners_of_model.data = data;
+                ctx.accounts.miner_account.model_index = 0;
+            } else {
+                return Err(SolLearnError::MinerNotRegistered.into());
+            }
         }
 
         Ok(())
@@ -403,6 +406,7 @@ pub mod solearn {
 
         let models = &mut ctx.accounts.models;
         models.data.extend_from_slice(model.as_ref());
+        ctx.accounts.miners_of_model.bump = ctx.bumps.miners_of_model;
         ctx.accounts.sol_learn_account.total_models += 1;
 
         Ok(())

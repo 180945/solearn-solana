@@ -9,7 +9,7 @@ pub enum SolLearnError {
     Activated,
     MustJoinMintingFirst,
     MinerNotRegistered,
-    Unstaked,
+    Unstaking,
     MinerNotActive,
     MustUseJoinMintingInstead,
     NeedToWait,
@@ -52,4 +52,6 @@ pub enum SolLearnError {
     InsufficientFunds,
     #[msg("Invalid token")]
     InvalidToken,
+    #[msg("Nothing to Unstake")]
+    StakingZeroValue,
 }

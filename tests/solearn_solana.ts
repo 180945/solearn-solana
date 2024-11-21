@@ -185,8 +185,8 @@ describe('Solearn Bankrun example', () => {
     // let clock = await context.getClock();
     // console.log({clock});
 
-    let minerAccount = await program.account.minerAccount.fetch(accounts.minerAccount);
-    console.log({minerAccount});
+    // let minerAccount = await program.account.minerAccount.fetch(accounts.minerAccount);
+    // console.log({minerAccount});
 
 
     await sendAndConfirmTx(provider, [await program.instruction.minerUnstake(
