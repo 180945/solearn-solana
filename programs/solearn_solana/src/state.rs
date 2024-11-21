@@ -28,10 +28,7 @@ pub struct Initialize<'info> {
     )]
     pub models: Account<'info, Models>,
     #[account(
-        init, 
-        // realloc = 8 + wh_account.len(),
-        // realloc::payer = admin, 
-        // realloc::zero = false,
+        init,
         payer = admin, 
         space = 8 + WorkerHubStorage::LEN,
     )]
