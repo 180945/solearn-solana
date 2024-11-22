@@ -13,10 +13,10 @@ use anchor_spl::metadata::{
 use solearn_solana::cpi::accounts::InferVld;
 use anchor_spl::token::{self, Transfer};
 
-declare_id!("nuvdhmYq5Z2Eg4nBi29Tu2VcbpE9nuiCQ68rkyAB3A1");
+declare_id!("58MRHjRXa7e3KHGDNWSkytrDQEavX4vuQ3YNpEQzLYCE");
 
 #[program]
-pub mod nft_program {
+pub mod prompt_system_manager {
     use super::*;
 
     pub fn create_single_nft(

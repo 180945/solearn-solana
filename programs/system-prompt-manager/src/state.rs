@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
-use anchor_spl::token::{Token};
+use anchor_spl::token::Token;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::metadata::{Metadata};
+use anchor_spl::metadata::Metadata;
 use solearn_solana::program::Solearn;
 
 // init new nft
