@@ -16,7 +16,7 @@ import {
 import { LAMPORTS_PER_SOL, SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY, PublicKey, SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js';
 import { BankrunProvider } from 'anchor-bankrun';
 import { assert } from 'chai';
-import { startAnchor, Clock } from 'solana-bankrun';
+import { startAnchor } from 'solana-bankrun';
 
 const TOKEN_PROGRAM = TOKEN_PROGRAM_ID;
 const IDL = require('../target/idl/prompt_system_manager.json');
@@ -24,16 +24,8 @@ const PROGRAM_ID = new PublicKey(IDL.address);
 const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
 import { PromptSystemManager } from "../target/types/prompt_system_manager";
-import { confirmTransaction, createAccountsMintsAndTokenAccounts, makeKeypairs } from '@solana-developers/helpers';
+import { makeKeypairs } from '@solana-developers/helpers';
 import { SYSTEM_PROGRAM_ID } from '@coral-xyz/anchor/dist/cjs/native/system';
-
-const SECONDS = 1000;
-
-// Tests must complete within half this time otherwise
-// they are marked as slow. Since Anchor involves a little
-// network IO, these tests usually take about 15 seconds.
-const ANCHOR_SLOW_TEST_THRESHOLD = 40 * SECONDS;
-
 
 describe('Prompt System Manager Bankrun test', () => {
   const [admin, alice, bob, tokenMintA, tokenMintB, solearnAccount, model1, model2] = makeKeypairs(8);
@@ -49,24 +41,15 @@ describe('Prompt System Manager Bankrun test', () => {
     metadataProgram: METADATA_PROGRAM_ID,
   };
 
-  before('Init Prompt System Manager program', async () => {
-    // Then determine the account addresses we'll use for the offer and the vault
-  });
-
-  // We'll call this function from multiple tests, so let's seperate it out
-  const stake = async () => {
-    // fill in here
-  };
-
   const initProgram = async () => {
     context = await startAnchor('', [
       { name: 'prompt_system_manager', programId: PROGRAM_ID },
-      // { name: 'token_metadata', programId: METADATA_PROGRAM_ID },
     ], []);
-    provider = new BankrunProvider(context);
+    provider = anchor.AnchorProvider.env();
     connection = provider.connection;
-
-    program = new anchor.Program<PromptSystemManager>(IDL, provider);
+    anchor.setProvider(provider);
+    const payer = provider.wallet as anchor.Wallet;
+    program = anchor.workspace.PromptSystemManager as anchor.Program<PromptSystemManager>;
 
     const [aliceTokenAccountA, aliceTokenAccountB, bobTokenAccountA, bobTokenAccountB] = [alice, bob].flatMap((keypair) =>
       [tokenMintA, tokenMintB].map((mint) => getAssociatedTokenAddressSync(mint.publicKey, keypair.publicKey, false, TOKEN_PROGRAM)),
@@ -74,14 +57,9 @@ describe('Prompt System Manager Bankrun test', () => {
 
     // Airdrops to users, and creates two tokens mints 'A' and 'B'"
     const minimumLamports = await getMinimumBalanceForRentExemptMint(connection);
-
-    // 
-    const info = await connection.getAccountInfo(METADATA_PROGRAM_ID, "recent");
-    console.log({info})
-
     const sendSolInstructions: Array<TransactionInstruction> = [admin, alice, bob].map((account) =>
       SystemProgram.transfer({
-        fromPubkey: provider.publicKey,
+        fromPubkey: payer.publicKey,
         toPubkey: account.publicKey,
         lamports: 10 * LAMPORTS_PER_SOL,
       }),
@@ -89,7 +67,7 @@ describe('Prompt System Manager Bankrun test', () => {
 
     const createMintInstructions: Array<TransactionInstruction> = [tokenMintA, tokenMintB].map((mint) =>
       SystemProgram.createAccount({
-        fromPubkey: provider.publicKey,
+        fromPubkey: payer.publicKey,
         newAccountPubkey: mint.publicKey,
         lamports: minimumLamports,
         space: MINT_SIZE,
@@ -111,7 +89,7 @@ describe('Prompt System Manager Bankrun test', () => {
       },
     ].flatMap((mintDetails) => [
       createInitializeMint2Instruction(mintDetails.mint, 6, mintDetails.authority, null, TOKEN_PROGRAM),
-      createAssociatedTokenAccountIdempotentInstruction(provider.publicKey, mintDetails.ata, mintDetails.authority, mintDetails.mint, TOKEN_PROGRAM),
+      createAssociatedTokenAccountIdempotentInstruction(payer.publicKey, mintDetails.ata, mintDetails.authority, mintDetails.mint, TOKEN_PROGRAM),
       createMintToInstruction(mintDetails.mint, mintDetails.ata, mintDetails.authority, 1_000_000_000, [], TOKEN_PROGRAM),
     ]);
 
@@ -140,8 +118,6 @@ describe('Prompt System Manager Bankrun test', () => {
       accounts.metadataProgram,
     )[0];
 
-    console.log(accounts);
-
     // mint new collection
     await sendAndConfirmTx(provider, [await program.instruction.createSingleNft(
       collection_id,
@@ -153,46 +129,110 @@ describe('Prompt System Manager Bankrun test', () => {
       }
     )], [alice]);
 
-    // mint new nft id
-    // let nft_id = new BN(1);
-    // accounts.collection = accounts.mint;
-    // accounts.mint = PublicKey.findProgramAddressSync(
-    //   [Buffer.from('mint'), collection_id.toArrayLike(Buffer, 'le', 8), nft_id.toArrayLike(Buffer, 'le', 8)],
-    //   program.programId,
-    // )[0];
-    // accounts.token_account = getAssociatedTokenAddressSync(accounts.mint, accounts.authority, false, TOKEN_PROGRAM);
-    // accounts.masterEditionAccount = PublicKey.findProgramAddressSync(
-    //   [Buffer.from('metadata'), accounts.metadataProgram.toBuffer(), accounts.mint.toBuffer(), Buffer.from('edition')],
-    //   accounts.metadataProgram,
-    // )[0];
-    // accounts.nftMetadata = PublicKey.findProgramAddressSync(
-    //   [Buffer.from('metadata'), accounts.metadataProgram.toBuffer(), accounts.mint.toBuffer()],
-    //   accounts.metadataProgram,
-    // )[0];
 
-    // await sendAndConfirmTx(provider, [await program.instruction.mintToCollection(
-    //   collection_id,
-    //   nft_id,
-    //   "T",
-    //   "test",
-    //   "test",
-    //   {
-    //     accounts: {...accounts}
-    //   }
-    // )], [alice]);
+  //     #[account(
+  //         init_if_needed,
+  //         payer = payer,
+  //         associated_token::mint = mint,
+  //         associated_token::authority = payer,
+  //     )]
+  //     pub token_account: InterfaceAccount<'info, TokenAccount>,
+  //     pub associated_token_program: Program<'info, AssociatedToken>,
+  //     pub rent: Sysvar<'info, Rent>,
+  //     pub system_program: Program<'info, System>,
+  //     pub token_program: Program<'info, Token>,
+  //     pub metadata_program: Program<'info, Metadata>,
+  //     #[account(
+  //         mut,
+  //         seeds = [
+  //             b"metadata".as_ref(),
+  //             metadata_program.key().as_ref(),
+  //             mint.key().as_ref(),
+  //             b"edition".as_ref(),
+  //         ],
+  //         bump,
+  //         seeds::program = metadata_program.key()
+  //     )]
+  //     /// CHECK:
+  //     pub master_edition_account: UncheckedAccount<'info>,
+  //     #[account(
+  //         mut,
+  //         seeds = [
+  //             b"metadata".as_ref(),
+  //             metadata_program.key().as_ref(),
+  //             mint.key().as_ref(),
+  //         ],
+  //         bump,
+  //         seeds::program = metadata_program.key()
+  //     )]
+  //     /// CHECK:
+  //     pub nft_metadata: UncheckedAccount<'info>,
+  //     /// CHECK:
+  //     pub collection: UncheckedAccount<'info>,
+  // }
+
+    let nft_id = new BN(1);
+    accounts.collection = accounts.mint;
     
+    console.log("fucker");
+    console.log(accounts.mint);
 
+    accounts.mint = PublicKey.findProgramAddressSync(
+      [Buffer.from('mint'), collection_id.toArrayLike(Buffer, 'le', 8), nft_id.toArrayLike(Buffer, 'le', 8)],
+      program.programId,
+    )[0];
+
+    accounts.tokenAccount = getAssociatedTokenAddressSync(accounts.mint, accounts.authority, false, TOKEN_PROGRAM);
+    accounts.masterEditionAccount = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), accounts.metadataProgram.toBuffer(), accounts.mint.toBuffer(), Buffer.from('edition')],
+      accounts.metadataProgram,
+    )[0];
+    accounts.nftMetadata = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), accounts.metadataProgram.toBuffer(), accounts.mint.toBuffer()],
+      accounts.metadataProgram,
+    )[0];
+
+    // createAssociatedTokenAccountIdempotentInstruction(alice.publicKey, accounts.token_account, alice.publicKey, accounts.mint, TOKEN_PROGRAM)
+    await sendAndConfirmTx(provider, [await program.instruction.mintToCollection(
+      collection_id,
+      nft_id,
+      "test",
+      "T",
+      "test",
+      {
+        accounts: {...accounts}
+      }
+    )], [alice]);
+    
     // add metadata
+    accounts.promptAccount = PublicKey.findProgramAddressSync(
+      [Buffer.from('prompt'), collection_id.toArrayLike(Buffer, 'le', 8), nft_id.toArrayLike(Buffer, 'le', 8), accounts.tokenAccount.toBuffer()],
+      program.programId,
+    )[0];
+
+    await sendAndConfirmTx(provider, [await program.instruction.addPrompt(
+      collection_id,
+      nft_id,
+      Buffer.from("test add prompt", 'utf8'),
+      {
+        accounts: {...accounts}
+      }
+    )], [alice]);
+
 
     // update metadata
-    
+    await sendAndConfirmTx(provider, [await program.instruction.updatePrompt(
+      collection_id,
+      nft_id,
+      Buffer.from("test update", 'utf8'),
+      {
+        accounts: {...accounts}
+      }
+    )], [alice]);
   }
 
-  it('Test nft', async () => {
+  it('Create an NFT!', async () => {
     await initProgram();
-    // await stake();
-    // Configure the client to use the local cluster.
-    
   });
 
   const sendAndConfirmTx = async (providerAgr: any, insts: any, signers: any) => {

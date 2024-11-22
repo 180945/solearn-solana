@@ -128,24 +128,26 @@ pub struct MintToCollection<'info> {
 pub struct AddPrompt<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
         associated_token::mint = mint,
-        associated_token::authority = payer,
+        associated_token::authority = authority,
     )]
     pub token_account: InterfaceAccount<'info, TokenAccount>,
-    /// init new promt account
+    /// init new prompt account
     #[account( 
         init,
         payer = payer, 
-        seeds = ["promt".as_bytes(), 
+        seeds = ["prompt".as_bytes(), 
                 id_collection.to_le_bytes().as_ref(),
                 id_nft.to_le_bytes().as_ref(),
                 token_account.key().as_ref()],
         space = 8 + 1 + 8 + 4 + prompt.len(),
         bump,
     )]
-    pub promt_account: Account<'info, PromptAccount>,
+    pub prompt_account: Account<'info, PromptAccount>,
     pub system_program: Program<'info, System>,
 }
 
@@ -154,25 +156,26 @@ pub struct AddPrompt<'info> {
 pub struct UpdatePrompt<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
         associated_token::mint = mint,
-        associated_token::authority = payer,
+        associated_token::authority = authority,
     )]
     pub token_account: InterfaceAccount<'info, TokenAccount>,
-    /// init new promt account
     #[account( 
         mut,
         realloc = 8 + 1 + 8 + 4 + prompt.len(),
         realloc::payer = payer,
         realloc::zero = false,
-        seeds = ["promt".as_bytes(), 
+        seeds = ["prompt".as_bytes(), 
                 id_collection.to_le_bytes().as_ref(),
                 id_nft.to_le_bytes().as_ref(),
                 token_account.key().as_ref()], 
-        bump = promt_account.bump,
+        bump,
     )]
-    pub promt_account: Account<'info, PromptAccount>,
+    pub prompt_account: Account<'info, PromptAccount>,
     pub system_program: Program<'info, System>,
 }
 
@@ -181,6 +184,8 @@ pub struct UpdatePrompt<'info> {
 pub struct UpdateFee<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
     #[account( 
         seeds = ["mint".as_bytes(), 
                 id_collection.to_le_bytes().as_ref(),
@@ -190,19 +195,19 @@ pub struct UpdateFee<'info> {
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
         associated_token::mint = mint,
-        associated_token::authority = payer,
+        associated_token::authority = authority,
     )]
     pub token_account: InterfaceAccount<'info, TokenAccount>,
-    /// init new promt account
+    /// init new prompt account
     #[account( 
         mut,
-        seeds = ["promt".as_bytes(), 
+        seeds = ["prompt".as_bytes(), 
                 id_collection.to_le_bytes().as_ref(),
                 id_nft.to_le_bytes().as_ref(),
                 token_account.key().as_ref()], 
-        bump = promt_account.bump,
+        bump = prompt_account.bump,
     )]
-    pub promt_account: Account<'info, PromptAccount>,
+    pub prompt_account: Account<'info, PromptAccount>,
     pub system_program: Program<'info, System>,
 }
 
