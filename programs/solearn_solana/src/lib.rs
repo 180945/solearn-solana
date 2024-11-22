@@ -81,8 +81,8 @@ pub mod solearn {
         sol_learn_account.unstake_delay_time = unstake_delay_time;
 
         // vault account
-        ctx.accounts.vault_wallet_owner.bump = ctx.bumps.vault_wallet_owner;
-        msg!("vault PDA bump seed: {}", ctx.bumps.vault_wallet_owner);
+        ctx.accounts.vault_wallet_owner_pda.bump = ctx.bumps.vault_wallet_owner_pda;
+        msg!("vault PDA bump seed: {}", ctx.bumps.vault_wallet_owner_pda);
 
         // models
         ctx.accounts.models.bump = ctx.bumps.models;
