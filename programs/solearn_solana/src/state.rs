@@ -139,9 +139,9 @@ pub struct Topup<'info> {
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
-        bump = miner_info.bump,
+        bump = miner_account.bump,
     )]
-    pub miner_info: Account<'info, MinerInfo>,
+    pub miner_account: Account<'info, MinerInfo>,
     #[account(mut)]
     pub miner_staking_wallet: InterfaceAccount<'info, TokenAccount>,
     #[account(
@@ -308,7 +308,6 @@ pub struct MinerInfo {
     pub bump: u8,
     pub miner: Pubkey,
     pub model: Pubkey,
-    pub model_index: u64, // plus one already to make sure > 0
     pub stake_amount: u64,
     pub last_epoch: u64,
     pub active_time: u64,

@@ -54,4 +54,6 @@ pub enum SolLearnError {
     InvalidToken,
     #[msg("Nothing to Unstake")]
     StakingZeroValue,
+    #[msg("Invalid model index")]
+    InvalidModelIndex,
 }
