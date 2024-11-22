@@ -15,7 +15,7 @@ import {
 import { LAMPORTS_PER_SOL, SYSVAR_CLOCK_PUBKEY, PublicKey, SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js';
 import { BankrunProvider } from 'anchor-bankrun';
 import { assert } from 'chai';
-import { startAnchor } from 'solana-bankrun';
+import { startAnchor, Clock } from 'solana-bankrun';
 
 const TOKEN_PROGRAM = TOKEN_PROGRAM_ID;
 const IDL = require('../target/idl/solearn.json');
@@ -141,7 +141,8 @@ describe('Solearn Bankrun example', () => {
       new BN(1),
       new BN(10), // 10 blocks
       new BN(100), // fine 1%
-      zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue,
+      zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, 
+      new BN(10), // 10s unstaking
       {
         accounts: {...accounts}
       }
@@ -180,23 +181,48 @@ describe('Solearn Bankrun example', () => {
       }
     )], [alice]);
 
-    // todo: join for minting
-
-    // let clock = await context.getClock();
-    // console.log({clock});
-
-    let minerAccount = await program.account.minerAccount.fetch(accounts.minerAccount);
-    console.log({minerAccount});
-
-
     await sendAndConfirmTx(provider, [await program.instruction.minerUnstake(
+      new BN(0),
       {
         accounts: {...accounts}
       }
     )], [alice]);
-    // time travel
+
+    const currentClock = await context.banksClient.getClock();
+    context.setClock(
+      new Clock(
+        currentClock.slot,
+        currentClock.epochStartTimestamp,
+        currentClock.epoch,
+        currentClock.leaderScheduleEpoch,
+        currentClock.unixTimestamp + 11n,
+      ),
+    );
 
     await sendAndConfirmTx(provider, [await program.instruction.minerClaimUnstaked(
+      {
+        accounts: {...accounts}
+      }
+    )], [alice]);
+
+    // topup 
+    await sendAndConfirmTx(provider, [await program.instruction.topup(
+      new BN(100000000),
+      {
+        accounts: {...accounts}
+      }
+    )], [alice]);
+
+    // join minting
+    await sendAndConfirmTx(provider, [await program.instruction.joinForMinting(
+      {
+        accounts: {...accounts}
+      }
+    )], [alice]);
+    
+    // unstake again
+    await sendAndConfirmTx(provider, [await program.instruction.minerUnstake(
+      new BN(0),
       {
         accounts: {...accounts}
       }
