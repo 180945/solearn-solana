@@ -5,8 +5,6 @@ use crate::{MinerInfo, MinersOfModel, Models, SolLearnInfo, VaultAccount};
 #[derive(Accounts)]
 pub struct UpdateParamsVld<'info> {
     #[account(mut)]
-    pub wh_account: Account<'info, WorkerHubStorage>,
-    #[account(mut)]
     pub admin: Signer<'info>,
     /// CHECK:
     #[account(mut, constraint = sol_learn_account.admin == admin.key())]
@@ -17,7 +15,7 @@ pub struct UpdateParamsVld<'info> {
 #[derive(Accounts)]
 pub struct ReadStateVld<'info> {
     #[account(mut)]
-    pub wh_account: Account<'info, WorkerHubStorage>,
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
 }
 
 #[account]
@@ -87,20 +85,24 @@ pub struct InferVld<'info> {
     #[account(
         init,
         payer = signer,
-        space = 8 + 2 + 4 + 2000 + 1, seeds = [b"inference", inference_id.to_le_bytes().as_ref()], bump
+        space = 8 + 2 + 4 + 2000 + 1, seeds = [b"inference", sol_learn_account.key().as_ref(), inference_id.to_le_bytes().as_ref()], bump
     )]
     pub infs: Account<'info, Inference>,
-    #[account(init, payer = signer, space = 8 + 8)]
+    #[account(mut)]
     pub sol_learn_account: Account<'info, WorkerHubStorage>,
-    #[account(mut, seeds = [b"assignment", signer.key().as_ref()], bump = assignment.bump)]
-    pub assignment: Account<'info, Assignment>,
-    #[account(mut)]
-    pub miner_addresses: Account<'info, Pubkeys>,
-    #[account(mut)]
+    // #[account(mut, seeds = [b"assignment", signer.key().as_ref()], bump = assignment.bump)]
+    // pub assignment: Account<'info, Assignment>,
+    // #[account(mut)]
+    // pub miner_addresses: Account<'info, Pubkeys>,
+    #[account(mut,
+        realloc = 1 + 8 + tasks.values.len() * 50,
+        realloc::payer = signer, 
+        realloc::zero = false,
+    )]
 	pub tasks: Account<'info, Tasks>,
 	#[account(mut)]
 	pub models: Account<'info, Models>,
-	#[account(mut, seeds = [b"referrer", creator.to_bytes().as_ref()], bump = referrer.bump)]
+	#[account(init, payer = signer, space = 40, seeds = [b"referrer", creator.to_bytes().as_ref()], bump)]
 	pub referrer: Account<'info, Referrer>,
     #[account(mut)]
     pub miners_of_model: Account<'info, MinersOfModel>,
@@ -230,9 +232,9 @@ pub struct DAOTokenPercentage {
 pub struct UpdateEpochVld<'info> {
     pub system_program: Program<'info, System>,
     #[account(mut)]
-    pub wh_account: Account<'info, WorkerHubStorage>,
-    #[account(mut)]
-    pub miner_addresses: Account<'info, Pubkeys>,
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    // #[account(mut)]
+    // pub miner_addresses: Account<'info, Pubkeys>,
     #[account(mut, seeds = [b"reward_in_epoch", epoch_id.to_le_bytes().as_ref()], bump = miner_reward.bump)]
     pub miner_reward: Account<'info, MinerEpochState>,
     // #[account(mut)]
@@ -243,10 +245,10 @@ pub struct UpdateEpochVld<'info> {
 #[derive(Accounts)]
 pub struct SlashMinerByAdminVld<'info> {
     pub system_program: Program<'info, System>,
-    #[account(mut)]
-    pub wh_account: Account<'info, WorkerHubStorage>,
-    #[account(mut)]
-    pub miner_addresses: Account<'info, Pubkeys>,
+    // #[account(mut)]
+    // pub sol_learn_account: Account<'info, SolLearnInfo>,
+    // #[account(mut)]
+    // pub miner_addresses: Account<'info, Pubkeys>,
     #[account(mut)]
     pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
@@ -290,9 +292,9 @@ pub struct PayMinerVld<'info> {
 pub struct SlashMinerVld<'info> {
 	// pub system_program: Program<'info, System>,
 	#[account(mut)]
-	pub wh_account: Account<'info, WorkerHubStorage>,
-	#[account(mut)]
-	pub miner_addresses: Account<'info, Pubkeys>,
+	pub sol_learn_account: Account<'info, SolLearnInfo>,
+	// #[account(mut)]
+	// pub miner_addresses: Account<'info, Pubkeys>,
 	#[account(mut)]
 	pub miner: Account<'info, MinerInfo>,
 	#[account(mut)]
@@ -321,23 +323,28 @@ pub struct SlashMinerVld<'info> {
 #[instruction(assignment_id: u64)]
 pub struct UpdateAssignmentVld<'info> {
     #[account(mut)]
-    pub wh_account: Account<'info, WorkerHubStorage>,
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
     #[account(mut)]
     pub infs: Account<'info, Inference>,
     #[account(mut)]
     pub assignment: Account<'info, Assignment>,
-    #[account(mut)]
-    pub miner_addresses: Account<'info, Pubkeys>,
+    // #[account(mut)]
+    // pub miner_addresses: Account<'info, Pubkeys>,
     // #[account(mut)]
     // pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
     pub miner: Account<'info, MinerInfo>,
     #[account(mut)]
     pub voting_info: Account<'info, VotingInfo>,
-    #[account(mut)]
+    #[account(mut,
+        realloc = 1 + 8 + tasks.values.len() * 50,
+        realloc::payer = signer, 
+        realloc::zero = false,
+    )]
 	pub tasks: Account<'info, Tasks>,
     #[account(mut, seeds = [b"dao_receivers_info", signer.key().as_ref()], bump = dao_receiver_infos.bump)]
     pub dao_receiver_infos: Account<'info, DAOTokenReceiverInfos>,
+    #[account(mut)]
     pub signer: Signer<'info>,
     #[account(mut)]
     pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
@@ -352,21 +359,21 @@ pub struct UpdateAssignmentVld<'info> {
 #[derive(Accounts)]
 pub struct UpdateMinerAddressesByModelVld<'info> {
     #[account(mut)]
-    pub wh_account: Account<'info, WorkerHubStorage>,
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
     pub signer: Signer<'info>,
-    #[account(mut)]
-    pub miner_addresses: Account<'info, Pubkeys>,
+    // #[account(mut)]
+    // pub miner_addresses: Account<'info, Pubkeys>,
 }
 
-#[derive(Accounts)]
-pub struct UpdateTaskVld<'info> {
-	#[account(mut)]
-	pub wh_account: Account<'info, WorkerHubStorage>,
-	#[account(mut)]
-	pub tasks: Account<'info, Tasks>,
-	#[account(mut)]
-	pub signer: Signer<'info>,
-}
+// #[derive(Accounts)]
+// pub struct UpdateTaskVld<'info> {
+// 	#[account(mut)]
+// 	pub sol_learn_account: Account<'info, SolLearnInfo>,
+// 	#[account(mut)]
+// 	pub tasks: Account<'info, Tasks>,
+// 	#[account(mut)]
+// 	pub signer: Signer<'info>,
+// }
 
 
 // #[account]
@@ -437,6 +444,7 @@ pub struct Task {
 
 #[account]
 pub struct Tasks {
+    pub bump: u8,
 	pub values: Vec<Task>,
 }
 

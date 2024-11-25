@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-use crate::{DAOTokenPercentage, WorkerHubStorage};
+use crate::{DAOTokenPercentage, Tasks, WorkerHubStorage};
 
 // init pda to store list of models
 #[derive(Accounts)]
@@ -35,10 +35,28 @@ pub struct Initialize<'info> {
         payer = admin, 
         space = 8 + WorkerHubStorage::LEN,
     )]
-    pub sol_learn_account: Account<'info, WorkerHubStorage>,
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
 }
+
+#[derive(Accounts)]
+pub struct InitializeExtra<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    #[account(
+        init, 
+        payer = admin, 
+        space = 8 + 8,
+        seeds = [b"tasks", sol_learn_account.key().as_ref()], 
+        bump
+    )]
+    pub tasks: Account<'info, Tasks>,
+    #[account(mut, constraint = sol_learn_account.admin == admin.key())]
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub system_program: Program<'info, System>,
+}
+
 
 #[derive(Accounts)]
 #[instruction(model: Pubkey)]
@@ -53,8 +71,8 @@ pub struct AddModel<'info> {
         realloc = 8 + Models::LEN + models.data.len() + 32,
         realloc::payer = admin,
         realloc::zero = false,
-        seeds = [b"models", sol_learn_account.key().as_ref()], 
-        bump = models.bump,
+        // seeds = [b"models", sol_learn_account.key().as_ref()], 
+        // bump = models.bump,
     )]
     pub models: Account<'info, Models>,
     #[account(
@@ -81,8 +99,8 @@ pub struct RemoveModel<'info> {
         realloc = 8 + 1 + 4 + 8 + 8 + models.data.len() + 32,
         realloc::payer = admin,
         realloc::zero = false,
-        seeds = [b"models", sol_learn_account.key().as_ref()], 
-        bump = models.bump,
+        // seeds = [b"models", sol_learn_account.key().as_ref()], 
+        // bump = models.bump,
     )]
     pub models: Account<'info, Models>,
     #[account(
@@ -103,8 +121,8 @@ pub struct MinerRegister<'info> {
     #[account(mut)]
     pub sol_learn_account: Account<'info, SolLearnInfo>,
     #[account(
-        seeds = [b"models", sol_learn_account.key().as_ref()], 
-        bump = models.bump,
+        // seeds = [b"models", sol_learn_account.key().as_ref()], 
+        // bump = models.bump,
     )]
     pub models: Account<'info, Models>,
     #[account(
@@ -335,10 +353,10 @@ impl VaultAccount {
 
 #[account]
 pub struct Models {
-    pub bump: u8, 
+    // pub bump: u8, 
     pub data: Vec<u8>,
-    pub minimum_fee: u64,
-    pub tier: u32,
+    // pub minimum_fee: u64,
+    // pub tier: u32,
 }
 
 impl Models {

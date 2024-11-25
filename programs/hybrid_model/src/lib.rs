@@ -107,8 +107,8 @@ pub mod hybrid_model {
             infs: ctx.accounts.infs.to_account_info(),
             system_program: ctx.accounts.system_program.to_account_info(), // Add missing field
             sol_learn_account: ctx.accounts.sol_learn_account.to_account_info(), // Add missing field
-            assignment: ctx.accounts.assignment.to_account_info(), // Add missing field
-            miner_addresses: ctx.accounts.miner_addresses.to_account_info(), // Add missing field
+            // assignment: ctx.accounts.assignment.to_account_info(), // Add missing field
+            // miner_addresses: ctx.accounts.miner_addresses.to_account_info(), // Add missing field
             tasks: ctx.accounts.tasks.to_account_info(), // Add missing field
             signer: ctx.accounts.signer.to_account_info(), // Add missing field
             vault_wallet_owner_pda: ctx.accounts.vault_wallet_owner_pda.to_account_info(), // Add missing field
@@ -117,7 +117,7 @@ pub mod hybrid_model {
             referrer: ctx.accounts.referrer.to_account_info(),
             token_program: ctx.accounts.token_program.to_account_info(),
             vault_staking_wallet: ctx.accounts.vault_staking_wallet.to_account_info(),
-            miners_of_model: ctx.accounts.miner_addresses.to_account_info(),
+            miners_of_model: ctx.accounts.miners_of_model.to_account_info(),
         };
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         solearn_solana::cpi::infer(cpi_ctx, input, creator, _value, inference_id, ctx.accounts.models.key())?;

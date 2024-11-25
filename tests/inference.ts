@@ -59,7 +59,6 @@ export async function initProgram(_s) {
   // Airdrops to users, and creates two tokens mints 'A' and 'B'"
   const minimumLamports = await getMinimumBalanceForRentExemptMint(_s.connection);
 
-  console.log('creating transfer instructions');
   const sendSolInstructions: Array<TransactionInstruction> = [_s.admin, _s.alice, _s.bob].map((account) =>
     SystemProgram.transfer({
       fromPubkey: _s.provider.publicKey,
@@ -97,11 +96,10 @@ export async function initProgram(_s) {
   ]);
 
   // Add all these instructions to our transaction
-  const tx = new Transaction();
+  let tx = new Transaction();
   tx.instructions = [...sendSolInstructions, ...createMintInstructions, ...mintTokensInstructions];
 
   await _s.provider.sendAndConfirm(tx, [_s.tokenMintA, _s.tokenMintB, _s.alice, _s.bob]);
-  console.log('done sending transfer/mint instructions');
 
   _s.accounts.admin = _s.admin.publicKey;
   _s.accounts.stakingToken = _s.tokenMintA.publicKey;
@@ -115,6 +113,10 @@ export async function initProgram(_s) {
   _s.accounts.vaultWalletOwnerPda = vault_wallet_owner;
   _s.accounts.models = PublicKey.findProgramAddressSync(
     [Buffer.from('models'), _s.solearnAccount.publicKey.toBuffer()],
+    _s.program.programId,
+  )[0];
+  _s.accounts.tasks = PublicKey.findProgramAddressSync(
+    [Buffer.from('tasks'), _s.solearnAccount.publicKey.toBuffer()],
     _s.program.programId,
   )[0];
 
@@ -140,7 +142,12 @@ export async function initProgram(_s) {
       accounts: { ..._s.accounts }
     }
   )], [_s.admin, _s.solearnAccount]);
-  console.log('done init program');
+  _s.accounts.signer = _s.admin.publicKey;
+  await sendAndConfirmTx(_s.provider, [await _s.program.instruction.initialize2(
+    {
+      accounts: { ..._s.accounts }
+    }
+  )], [_s.admin]);
 
   _s.accounts.minersOfModel = PublicKey.findProgramAddressSync(
     [Buffer.from('models'), _s.solearnAccount.publicKey.toBuffer(), _s.model1.publicKey.toBuffer()],
@@ -236,7 +243,7 @@ export async function claimUnstakeAmount() {
 
 
 describe('Solearn Bankrun example', function () {
-  const [admin, alice, bob, tokenMintA, tokenMintB, solearnAccount, model1, model2] = makeKeypairs(8);
+  const [admin, alice, bob, eve, dom, tokenMintA, tokenMintB, solearnAccount, model1, model2] = makeKeypairs(10);
 
   let context, provider, connection, program, hmProgram;
   // We're going to reuse these accounts across multiple tests
@@ -246,9 +253,9 @@ describe('Solearn Bankrun example', function () {
     systemProgram: SYSTEM_PROGRAM_ID,
   };
   let state = {
-      admin, alice, bob, tokenMintA, tokenMintB, solearnAccount, model1, model2,
-      context, provider, connection, program, hmProgram, accounts
-    };
+    admin, alice, bob, eve, dom, tokenMintA, tokenMintB, solearnAccount, model1, model2,
+    context, provider, connection, program, hmProgram, accounts
+  };
   
 
   before(async () => {    
@@ -272,14 +279,23 @@ describe('Solearn Bankrun example', function () {
   async function simulateInferAndAssign(_s) {
     const workerHub = _s.program;
 
-      await workerHub.instruction.minerRegister(new BN(100000000),
-    {
-      accounts: { ..._s.accounts }
-    });
+    // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.minerRegister(new BN(100000000),
+    //   {
+    //     accounts: { ..._s.accounts }
+    //   })], [_s.eve]);
 
-      await workerHub.instruction.joinForMinting({
-      accounts: { ..._s.accounts }
-    });
+    // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.joinForMinting({
+    //   accounts: { ..._s.accounts }
+    // })], [_s.eve]);
+
+    // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.minerRegister(new BN(100000000),
+    //   {
+    //     accounts: { ..._s.accounts }
+    //   })], [_s.dom]);
+
+    // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.joinForMinting({
+    //   accounts: { ..._s.accounts }
+    // })], [_s.dom]);
 
     // expect((await workerHub.getMinerAddresses()).length).to.eq(18);
     // simulate contract model call to worker hub to create inference
@@ -287,11 +303,31 @@ describe('Solearn Bankrun example', function () {
     //   "HybridModel",
     //   hybridModelAddress
     // )) as HybridModel;
+    const creator = _s.alice.publicKey;
+    let num = new BN(1);
+    _s.accounts.infs = PublicKey.findProgramAddressSync(
+      [Buffer.from('inference'), _s.accounts.solLearnAccount.toBuffer(), num.toBuffer('le', 8)],
+      _s.program.programId,
+    )[0];
+    console.log('infs pda', PublicKey.findProgramAddressSync(
+      [Buffer.from('inference'), _s.accounts.solLearnAccount.toBuffer(), num.toBuffer('le', 8)],
+      _s.program.programId,
+    ))
+    _s.accounts.referrer = PublicKey.findProgramAddressSync(
+      [Buffer.from('referrer'), creator.toBuffer()],
+      _s.program.programId,
+    )[0];
+    _s.accounts.signer = _s.alice.publicKey;
 
-    const modelInput = Uint8Array.from(randomBytes(32));
-    await workerHub.instruction.infer(modelInput, {
-      accounts: { ..._s.accounts }
-    });
+    const modelInput = Buffer.from(randomBytes(32));
+    console.log('before infer, model input', modelInput);
+    
+    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.infer(modelInput, creator,
+      new BN(100000), num, _s.model1.publicKey,
+      {
+        accounts: { ..._s.accounts }
+      })], [_s.alice]);
+    console.log('done infer');
 
     // const blockNumber = await getBlockNumber();
     // const block = await getBlock(blockNumber);
@@ -319,9 +355,10 @@ describe('Solearn Bankrun example', function () {
   describe('Test staking', async function () {
 
     
-    it('should stake', async function () {
+    it('should call infer and get assigned', async function () {
+      // setup
       await initProgram(state);
-      await stake();
+      await simulateInferAndAssign(state);
     });
     // Configure the client to use the local cluster.
     

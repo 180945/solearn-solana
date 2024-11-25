@@ -39,11 +39,11 @@ pub struct CpiInferVld<'info> {
     #[account(mut)]
     pub sol_learn_account: UncheckedAccount<'info>,
     /// CHECK:
-    #[account(mut)]
-    pub assignment: UncheckedAccount<'info>,
+    // #[account(mut)]
+    // pub assignment: UncheckedAccount<'info>,
     /// CHECK:
     #[account(mut)]
-    pub miner_addresses: UncheckedAccount<'info>,
+    pub miners_of_model: UncheckedAccount<'info>,
     /// CHECK:
     #[account(mut)]
     pub tasks: UncheckedAccount<'info>,

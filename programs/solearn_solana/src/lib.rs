@@ -84,11 +84,19 @@ pub mod solearn {
         ctx.accounts.vault_wallet_owner_pda.bump = ctx.bumps.vault_wallet_owner_pda;
         msg!("vault PDA bump seed: {}", ctx.bumps.vault_wallet_owner_pda);
 
-        // models
-        ctx.accounts.models.bump = ctx.bumps.models;
-        msg!("models PDA bump seed: {}", ctx.bumps.models);
-
         
+
+        Ok(())
+    }
+
+    pub fn initialize2(ctx: Context<InitializeExtra>) -> Result<()> {
+        msg!("Instruction: Initialize2");
+
+        let t = &mut ctx.accounts.tasks;
+        t.values = vec![];
+        t.bump = ctx.bumps.tasks;
+
+        msg!("Tasks bump seed: {}", ctx.bumps.tasks);
 
         Ok(())
     }
@@ -438,28 +446,28 @@ pub mod solearn {
     // setNewRewardInEpoch
 
     pub fn set_miner_min_stake(ctx: Context<UpdateParamsVld>, data: u64) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         acc.miner_minimum_stake = data.into();
         Ok(())
     }
 
     pub fn next_inference_id(ctx: Context<ReadStateVld>) -> Result<u64> {
-        let acc = &ctx.accounts.wh_account;
+        let acc = &ctx.accounts.sol_learn_account;
         Ok(acc.inference_number)
     }
 
     pub fn next_assignment_id(ctx: Context<ReadStateVld>) -> Result<u64> {
-        let acc = &ctx.accounts.wh_account;
+        let acc = &ctx.accounts.sol_learn_account;
         Ok(acc.assignment_number)
     }
 
     pub fn next_epoch_id(ctx: Context<ReadStateVld>) -> Result<u64> {
-        let acc = &ctx.accounts.wh_account;
+        let acc = &ctx.accounts.sol_learn_account;
         Ok(acc.last_epoch + 1)
     }
 
     pub fn update_epoch(ctx: Context<UpdateEpochVld>, epoch_id: u64) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
 
         let slot_number = Clock::get()?.slot;
         let epoch_passed = (slot_number - acc.last_block) / acc.blocks_per_epoch;
@@ -491,16 +499,29 @@ pub mod solearn {
         model: Pubkey,
     ) -> Result<u64> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        let model = &mut ctx.accounts.models;
+        let mdls = &mut ctx.accounts.models;
         let miners_of_model = &mut ctx.accounts.miners_of_model;
         let miners_len = miners_of_model.data.len() / 32;
-        if model.tier == 0 {
-            return Err(SolLearnError::Unauthorized.into());
-        }
-        let b: [u8; 32] = model.data[0..32].try_into().unwrap();
-        let model_pubkey = Pubkey::new_from_array(b);
+        // if model.tier == 0 {
+        //     return Err(SolLearnError::Unauthorized.into());
+        // }
 
-        let scoring_fee = validate_enough_fee_to_use(model.minimum_fee, _value)?;
+        // find model
+        for i in 0..mdls.data.len() / 32 {
+            let b: [u8; 32] = mdls.data[i * 32..(i + 1) * 32].try_into().unwrap();
+            let model_pubkey = Pubkey::new_from_array(b);
+            if model_pubkey == model {
+                break;
+            }
+            if i == mdls.data.len() / 32 - 1 {
+                return Err(SolLearnError::ModelNotExist.into());
+            }
+        }
+
+        // let b: [u8; 32] = model.data[0..32].try_into().unwrap();
+        // let model_pubkey = Pubkey::new_from_array(b);
+
+        let scoring_fee = validate_enough_fee_to_use(acc.min_fee_to_use, _value)?;
 
         let cpi_accounts = Transfer {
             from: ctx.accounts.miner_staking_wallet.to_account_info(),
@@ -538,7 +559,7 @@ pub mod solearn {
         inference.value = value - fee_l2 - fee_treasury;
         inference.creator = creator;
         inference.referrer = ctx.accounts.referrer.pubkey;
-        inference.model_address = model_pubkey;
+        inference.model_address = model;
         inference.bump = ctx.bumps.infs;
 
         let slot_number = Clock::get()?.slot;
@@ -587,7 +608,7 @@ pub mod solearn {
         emit!(NewInference {
             inference_id,
             creator,
-            model_address: model_pubkey,
+            model_address: model,
             value,
         });
 
@@ -673,7 +694,7 @@ pub mod solearn {
     }
 
     pub fn seize_miner_role(ctx: Context<UpdateAssignmentVld>, assignment_id: u64) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         let inference = &mut ctx.accounts.infs;
         let assignment = &mut ctx.accounts.assignment;
 
@@ -709,7 +730,7 @@ pub mod solearn {
         assignment_id: u64,
         data: Vec<u8>,
     ) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
 
         let assignment = &mut ctx.accounts.assignment;
@@ -761,7 +782,7 @@ pub mod solearn {
         assignment_id: u64,
         commitment: [u8; 32],
     ) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
         let assignment = &mut ctx.accounts.assignment;
         let inference = &mut ctx.accounts.infs;
@@ -820,7 +841,7 @@ pub mod solearn {
         nonce: u64,
         data: Vec<u8>,
     ) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
         let assignment = &mut ctx.accounts.assignment;
         let inference = &mut ctx.accounts.infs;
@@ -898,7 +919,7 @@ pub mod solearn {
     }
 
     pub fn resolve_inference(ctx: Context<UpdateAssignmentVld>, assignment_id: u64) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         let inference = &mut ctx.accounts.infs;
         let assignment = &mut ctx.accounts.assignment;
         let dao_receivers = &mut ctx.accounts.dao_receiver_infos;
@@ -1106,7 +1127,7 @@ pub mod solearn {
         _miner: Pubkey,
         is_fined: bool,
     ) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
 
         if _miner == Pubkey::default() {
@@ -1125,7 +1146,7 @@ pub mod solearn {
     }
 
     pub fn slash_miner(ctx: Context<SlashMinerVld>, assignment_id: u64) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         let miner_addresses = &mut ctx.accounts.miners_of_model;
         let miner = &mut ctx.accounts.miner;
         let assignment = &mut ctx.accounts.assignment;
@@ -1175,7 +1196,7 @@ pub mod solearn {
             _slash_miner(miner, is_fined, acc, miner_addresses)?
         };
         if token_fine > 0 {
-            if ctx.accounts.wh_account.treasury == ctx.accounts.token_recipient.key() {
+            if ctx.accounts.sol_learn_account.treasury == ctx.accounts.token_recipient.key() {
                 return Err(SolLearnError::Unauthorized.into());
             }
             let cpi_accounts = Transfer {
@@ -1195,7 +1216,7 @@ pub mod solearn {
         ctx: Context<UpdateEpochVld>,
         score: u8,
     ) -> Result<u64> {
-        let acc = &ctx.accounts.wh_account;
+        let acc = &ctx.accounts.sol_learn_account;
         let mut user_dao_token_receive = 0;
 
         if score >= 1 && score <= 10 {
@@ -1209,7 +1230,7 @@ pub mod solearn {
     }
 
     pub fn set_fine_percentage(ctx: Context<UpdateParamsVld>, fine_percentage: u16) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
 
         acc.fine_percentage = fine_percentage;
@@ -1224,7 +1245,7 @@ pub mod solearn {
         ctx: Context<UpdateParamsVld>,
         penalty_duration: u64,
     ) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
 
         acc.penalty_duration = penalty_duration;
@@ -1236,7 +1257,7 @@ pub mod solearn {
     }
 
     pub fn set_min_fee_to_use(ctx: Context<UpdateParamsVld>, min_fee_to_use: u64) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
 
         acc.min_fee_to_use = min_fee_to_use;
@@ -1248,7 +1269,7 @@ pub mod solearn {
     }
 
     pub fn set_l2_owner(ctx: Context<UpdateParamsVld>, l2_owner_address: Pubkey) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
 
         acc.l2_owner = l2_owner_address;
@@ -1260,7 +1281,7 @@ pub mod solearn {
     }
 
     // pub fn set_dao_token(ctx: Context<UpdateParamsVld>, dao_token_address: Pubkey) -> Result<()> {
-    //     let acc = &mut ctx.accounts.wh_account;
+    //     let acc = &mut ctx.accounts.sol_learn_account;
     //     only_updated_epoch(acc)?;
 
     //     acc.dao_token = dao_token_address;
@@ -1275,7 +1296,7 @@ pub mod solearn {
         ctx: Context<UpdateParamsVld>,
         treasury_address: Pubkey,
     ) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
 
         acc.treasury = treasury_address;
@@ -1290,7 +1311,7 @@ pub mod solearn {
         ctx: Context<UpdateParamsVld>,
         new_ratio: u16,
     ) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
 
         acc.fee_ratio_miner_validator = new_ratio;
@@ -1305,7 +1326,7 @@ pub mod solearn {
         ctx: Context<UpdateParamsVld>,
         new_dao_token_reward: u64,
     ) -> Result<()> {
-        let acc = &mut ctx.accounts.wh_account;
+        let acc = &mut ctx.accounts.sol_learn_account;
         only_updated_epoch(acc)?;
 
         acc.dao_token_reward = new_dao_token_reward;
