@@ -492,15 +492,18 @@ pub mod solearn {
 
     pub fn infer(
         ctx: Context<InferVld>,
-        input: Vec<u8>,
-        creator: Pubkey,
-        _value: u64,
         inference_id: u64,
+        creator: Pubkey,
+        input: Vec<u8>,
+        _value: u64,
         model: Pubkey,
     ) -> Result<u64> {
         let acc = &mut ctx.accounts.sol_learn_account;
         let mdls = &mut ctx.accounts.models;
         let miners_of_model = &mut ctx.accounts.miners_of_model;
+        // let referrer = &mut ctx.accounts.referrer;
+        // referrer.bump = ctx.bumps.referrer;
+
         let miners_len = miners_of_model.data.len() / 32;
         // if model.tier == 0 {
         //     return Err(SolLearnError::Unauthorized.into());
@@ -526,12 +529,12 @@ pub mod solearn {
         let cpi_accounts = Transfer {
             from: ctx.accounts.miner_staking_wallet.to_account_info(),
             to: ctx.accounts.vault_staking_wallet.to_account_info(),
-            authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+            authority: ctx.accounts.signer.to_account_info(),
         };
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        token::transfer(cpi_ctx, _value)?;
 
+        token::transfer(cpi_ctx, _value)?;
         // let from = ctx.accounts.signer.to_account_info();
         // let to = ctx.accounts.vault_wallet_owner_pda.to_account_info();
         // if **from.try_borrow_lamports()? < _value {
@@ -558,7 +561,7 @@ pub mod solearn {
         inference.fee_treasury = fee_treasury;
         inference.value = value - fee_l2 - fee_treasury;
         inference.creator = creator;
-        inference.referrer = ctx.accounts.referrer.pubkey;
+        // inference.referrer = referrer.pubkey;
         inference.model_address = model;
         inference.bump = ctx.bumps.infs;
 
@@ -569,6 +572,7 @@ pub mod solearn {
         inference.commit_timeout = commit_timeout;
         inference.reveal_timeout = commit_timeout + acc.reveal_duration;
         inference.status = 1;
+        inference.assignments = vec![];
 
         let n = acc.miner_requirement;
         let mut selected_miners = Vec::with_capacity(n as usize);

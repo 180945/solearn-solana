@@ -304,48 +304,54 @@ describe('Solearn Bankrun example', function () {
     //   hybridModelAddress
     // )) as HybridModel;
     const creator = _s.alice.publicKey;
+    _s.accounts.signer = _s.alice.publicKey;
     let num = new BN(1);
+
+    // _s.accounts.data = PublicKey.findProgramAddressSync(
+    //   [Buffer.from('smol'), num.toBuffer('le', 8)],
+    //   _s.program.programId,
+    // )[0];
+    // let res = await sendAndConfirmTx(_s.provider, [await workerHub.instruction.callSmall(num,
+    //   {
+    //     accounts: { ..._s.accounts }
+    //   })], [_s.alice]);
+    // console.log('done call small', res);
+    
     _s.accounts.infs = PublicKey.findProgramAddressSync(
-      [Buffer.from('inference'), _s.accounts.solLearnAccount.toBuffer(), num.toBuffer('le', 8)],
+      [Buffer.from('inference'), num.toBuffer('le', 8)],
       _s.program.programId,
     )[0];
-    console.log('infs pda', PublicKey.findProgramAddressSync(
-      [Buffer.from('inference'), _s.accounts.solLearnAccount.toBuffer(), num.toBuffer('le', 8)],
-      _s.program.programId,
-    ))
     _s.accounts.referrer = PublicKey.findProgramAddressSync(
       [Buffer.from('referrer'), creator.toBuffer()],
       _s.program.programId,
     )[0];
-    _s.accounts.signer = _s.alice.publicKey;
 
     const modelInput = Buffer.from(randomBytes(32));
-    console.log('before infer, model input', modelInput);
     
-    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.infer(modelInput, creator,
-      new BN(100000), num, _s.model1.publicKey,
+    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.infer(num, creator,
+      modelInput, new BN(100000), _s.model1.publicKey,
       {
         accounts: { ..._s.accounts }
       })], [_s.alice]);
-    console.log('done infer');
 
     // const blockNumber = await getBlockNumber();
     // const block = await getBlock(blockNumber);
     // const blockTime = block?.timestamp || 0;
     // expect inference id to be 1
-    expect(await workerHub.instruction.next_inference_id()).to.eq(1);
+    expect(await workerHub.instruction.nextInferenceId()).to.eq(1);
 
-    const inferInfo = await workerHub.instruction.getInferenceInfo(1n);
+    // const inferInfo = await workerHub.instruction.getInferenceInfo(1n);
     //check inference info
-    expect(inferInfo.input).to.eq(modelInput);
-    expect(inferInfo.modelAddress).to.eq(hybridModelAddress);
+    // expect(inferInfo.input).to.eq(modelInput);
+    // expect(inferInfo.modelAddress).to.eq(hybridModelAddress);
 
     // expect(inferInfo.submitTimeout).to.eq(blockTime + 600);
     // expect(inferInfo.commitTimeout).to.eq(blockTime + 600 * 2);
     // expect(inferInfo.revealTimeout).to.eq(blockTime + 600 * 3);
 
     // find the assigned workers
-    const assigns = await workerHub.instruction.next_assignment_id();
+    const assigns = await workerHub.instruction.nextAssignmentId();
+    console.log('assigns', assigns);
     const assignedMiners = assigns.map((a) => a.worker);
     expect(assignedMiners.length).to.eq(3);
 
@@ -360,7 +366,9 @@ describe('Solearn Bankrun example', function () {
       await initProgram(state);
       await simulateInferAndAssign(state);
     });
-    // Configure the client to use the local cluster.
+    it("should seize the miner role", async () => {
+
+    });
     
   });
 

@@ -4,6 +4,7 @@ use crate::errors::*;
 use crate::state_inf::*;
 use crate::MinerInfo;
 use crate::MinersOfModel;
+use crate::SolLearnInfo;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak::hash;
 
@@ -18,7 +19,7 @@ pub fn validate_enough_fee_to_use(minimum_fee: u64, value: u64) -> Result<u64> {
     Ok(minimum_fee)
 }
 
-// pub fn update_epoch(es: &mut WorkerHubStorage, ms: &mut MinerEpochState) -> Result<()> {
+// pub fn update_epoch(es: &mut SolLearnInfo, ms: &mut MinerEpochState) -> Result<()> {
 //     let slot_number = Clock::get()?.slot;
 //     let epoch_passed = (slot_number - es.last_block) / es.blocks_per_epoch;
 //     if epoch_passed > 0 {
@@ -36,7 +37,7 @@ pub fn validate_enough_fee_to_use(minimum_fee: u64, value: u64) -> Result<u64> {
 //     Ok(())
 // }
 
-pub fn only_updated_epoch(es: &mut WorkerHubStorage) -> Result<()> {
+pub fn only_updated_epoch(es: &mut SolLearnInfo) -> Result<()> {
     let slot_number = Clock::get()?.slot;
     let epoch_passed = (slot_number - es.last_block) / es.blocks_per_epoch;
     if epoch_passed > 0 {
@@ -55,7 +56,7 @@ pub fn only_empty_tasks(t: &mut Tasks) -> Result<()> {
 pub fn _slash_miner(
     miner: &mut MinerInfo,
     is_fined: bool,
-    acc: &mut WorkerHubStorage,
+    acc: &mut SolLearnInfo,
     miner_addresses: &mut MinersOfModel,
 ) -> Result<u64> {
     // if !acc.miner_addresses.values.contains(&miner.miner) {
@@ -116,7 +117,7 @@ pub fn _slash_miner(
 }
 
 pub fn calculate_transferred_dao_token(
-    acc: &mut WorkerHubStorage,
+    acc: &mut SolLearnInfo,
     inference: &mut Inference,
     dao_receivers: &mut DAOTokenReceiverInfos,
     is_referred: bool,
@@ -165,7 +166,7 @@ pub fn calculate_transferred_dao_token(
 }
 
 pub fn filter_commitment(
-    acc: &mut WorkerHubStorage,
+    acc: &mut SolLearnInfo,
     inference: &mut Inference,
     assignment: &mut Assignment,
     dao_receivers: &mut DAOTokenReceiverInfos,

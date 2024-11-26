@@ -55,6 +55,7 @@ pub enum AssignmentRole {
 
 #[account]
 pub struct Inference {
+    pub bump: u8,
     pub id: u64,
     pub assignments: Vec<u64>,
     pub digests: Hashes,
@@ -70,7 +71,6 @@ pub struct Inference {
     pub creator: Pubkey,
     pub processed_miner: Pubkey,
     pub referrer: Pubkey,
-    pub bump: u8,
 }
 
 #[account]
@@ -80,16 +80,17 @@ pub struct Referrer {
 }
 
 #[derive(Accounts)]
-#[instruction(inference_id: u64, creator: Pubkey, model: Pubkey)]
+#[instruction(inference_id: u64, creator: Pubkey)]
 pub struct InferVld<'info> {
     #[account(
         init,
         payer = signer,
-        space = 8 + 2 + 4 + 2000 + 1, seeds = [b"inference", sol_learn_account.key().as_ref(), inference_id.to_le_bytes().as_ref()], bump
+        space = 8*7 + 32*4 + 2 + 8 + 128, seeds = [b"inference", inference_id.to_le_bytes().as_ref()],
+        bump
     )]
     pub infs: Account<'info, Inference>,
     #[account(mut)]
-    pub sol_learn_account: Account<'info, WorkerHubStorage>,
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
     // #[account(mut, seeds = [b"assignment", signer.key().as_ref()], bump = assignment.bump)]
     // pub assignment: Account<'info, Assignment>,
     // #[account(mut)]
@@ -102,8 +103,8 @@ pub struct InferVld<'info> {
 	pub tasks: Account<'info, Tasks>,
 	#[account(mut)]
 	pub models: Account<'info, Models>,
-	#[account(init, payer = signer, space = 40, seeds = [b"referrer", creator.to_bytes().as_ref()], bump)]
-	pub referrer: Account<'info, Referrer>,
+	// #[account(mut, seeds = [b"referrer", creator.to_bytes().as_ref()], bump)]
+	// pub referrer: Account<'info, Referrer>,
     #[account(mut)]
     pub miners_of_model: Account<'info, MinersOfModel>,
     #[account(mut)]
@@ -192,6 +193,7 @@ pub enum Vote {
 
 #[account]
 pub struct Assignment {
+    pub bump: u8,
     pub id: u64,
     pub inference_id: u64,
     pub commitment: [u8; 32],
@@ -201,7 +203,6 @@ pub struct Assignment {
     pub role: u8,
     pub vote: u8,
     pub output: Vec<u8>,
-    pub bump: u8,
 }
 
 #[account]
@@ -264,10 +265,18 @@ pub struct SlashMinerByAdminVld<'info> {
 #[derive(Accounts)]
 #[instruction(assignment_id: u64)]
 pub struct CreateAssignmentVld<'info> {
-	#[account(mut)]
+	#[account(init,
+        payer = signer,
+        space = 8*3 + 32*3 + 1*3 + 8 + 8,
+        seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()],
+        bump
+    )]
 	pub assignment: Account<'info, Assignment>,
 	#[account(mut)]
 	pub tasks: Account<'info, Tasks>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -275,7 +284,10 @@ pub struct CreateAssignmentVld<'info> {
 pub struct PayMinerVld<'info> {
 	#[account(mut)]
 	pub tasks: Account<'info, Tasks>,
-	#[account(mut)]
+	#[account(mut,
+        seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()],
+        bump = assignment.bump
+    )]
     pub assignment: Account<'info, Assignment>,
 	#[account(mut)]
     pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
@@ -428,7 +440,7 @@ pub struct UpdateMinerAddressesByModelVld<'info> {
 //     // pub wEAI: Pubkey,
 // }
 
-pub type WorkerHubStorage = SolLearnInfo;
+// pub type WorkerHubStorage = SolLearnInfo;
 
 pub enum FnType {
 	CreateAssignment,
