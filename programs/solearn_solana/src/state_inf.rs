@@ -96,7 +96,7 @@ pub struct InferVld<'info> {
     // #[account(mut)]
     // pub miner_addresses: Account<'info, Pubkeys>,
     #[account(mut,
-        realloc = 1 + 8 + tasks.values.len() * 50,
+        realloc = 1 + 8 + 8 + tasks.values.len(),
         realloc::payer = signer, 
         realloc::zero = false,
     )]
@@ -442,6 +442,7 @@ pub struct UpdateMinerAddressesByModelVld<'info> {
 
 // pub type WorkerHubStorage = SolLearnInfo;
 
+#[derive(PartialEq)]
 pub enum FnType {
 	CreateAssignment,
 	PayMiner,
@@ -450,15 +451,63 @@ pub enum FnType {
 
 #[account]
 pub struct Task {
-	pub fn_type: u8,
-	pub data: Vec<u8>,
+    _b: [u8; 50],
 }
+
+impl Task {
+    pub fn fn_type(&self) -> FnType {
+        match self._b[0] {
+            0 => FnType::CreateAssignment,
+            1 => FnType::PayMiner,
+            2 => FnType::SlashMiner,
+            _ => panic!("Invalid task"),
+        }
+    }
+
+    pub fn data(&self) -> Vec<u8> {
+        let mut data = [0; 49];
+        data.copy_from_slice(&self._b[1..]);
+        data.to_vec()
+    }
+
+    pub fn new(fn_type: FnType, data: Vec<u8>) -> Self {
+        let mut task = Task {
+            _b: [0; 50],
+        };
+        task._b[0] = match fn_type {
+            FnType::CreateAssignment => 0,
+            FnType::PayMiner => 1,
+            FnType::SlashMiner => 2,
+        };
+        task._b[1..].copy_from_slice(&data);
+        task
+    }
+}
+
 
 #[account]
 pub struct Tasks {
     pub bump: u8,
-	pub values: Vec<Task>,
+	pub values: Vec<u8>,
 }
+
+impl Tasks {
+    pub fn push_task(&mut self, task: Task) {
+        self.values.extend(task._b.to_vec());
+    }
+
+    pub fn pop_task(&mut self) -> Option<Task> {
+        if self.values.len() < 50 {
+            return None;
+        }
+        let task: Vec<u8> = self.values.drain(self.values.len() - 50..).collect();
+        
+        Some(Task {
+            _b: task.try_into().unwrap(),
+        })
+    }
+}
+
 
 #[event]
 pub struct NewInference {

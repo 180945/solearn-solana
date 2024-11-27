@@ -18,6 +18,7 @@ pub enum SolLearnError {
     NothingToClaim,
     ModelNotExist,
     NoEnoughVault,
+    TooManyTasks,
     #[msg("You are not authorized to perform this action.")]
     Unauthorized,
     #[msg("Fee too low")]

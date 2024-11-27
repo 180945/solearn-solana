@@ -504,6 +504,7 @@ pub mod solearn {
         // let referrer = &mut ctx.accounts.referrer;
         // referrer.bump = ctx.bumps.referrer;
 
+        msg!("miner len {}", miners_of_model.data.len());
         let miners_len = miners_of_model.data.len() / 32;
         // if model.tier == 0 {
         //     return Err(SolLearnError::Unauthorized.into());
@@ -525,16 +526,6 @@ pub mod solearn {
         // let model_pubkey = Pubkey::new_from_array(b);
 
         let scoring_fee = validate_enough_fee_to_use(acc.min_fee_to_use, _value)?;
-
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.miner_staking_wallet.to_account_info(),
-            to: ctx.accounts.vault_staking_wallet.to_account_info(),
-            authority: ctx.accounts.signer.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-
-        token::transfer(cpi_ctx, _value)?;
         // let from = ctx.accounts.signer.to_account_info();
         // let to = ctx.accounts.vault_wallet_owner_pda.to_account_info();
         // if **from.try_borrow_lamports()? < _value {
@@ -577,9 +568,9 @@ pub mod solearn {
         let n = acc.miner_requirement;
         let mut selected_miners = Vec::with_capacity(n as usize);
         let tasks = &mut ctx.accounts.tasks;
-        if tasks.values.len() == 0 {
-            tasks.values = vec![];
-        }
+        msg!("tasks len: {}", tasks.values.len());
+        msg!("bump: {}", tasks.bump);
+
 
         for i in 0..n {
             let rand_uint = random_number(
@@ -599,7 +590,9 @@ pub mod solearn {
             data.extend_from_slice(&inference_id.to_le_bytes());
             data.extend_from_slice(&miner.to_bytes());
             data.push(1);
-            tasks.values.push(Task { fn_type: 0, data });
+            
+            tasks.push_task(Task::new(FnType::CreateAssignment, data.clone()));
+            msg!("push task: {:?}", data);
 
             selected_miners.push(miner);
             // assignments_by_miner[miner].insert(assignment_id);
@@ -615,6 +608,16 @@ pub mod solearn {
             model_address: model,
             value,
         });
+        
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.miner_staking_wallet.to_account_info(),
+            to: ctx.accounts.vault_staking_wallet.to_account_info(),
+            authority: ctx.accounts.signer.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+
+        token::transfer(cpi_ctx, _value)?;
 
         Ok(0)
     }
@@ -622,14 +625,14 @@ pub mod solearn {
     pub fn create_assignment(ctx: Context<CreateAssignmentVld>, assignment_id: u64) -> Result<()> {
         let tasks = &mut ctx.accounts.tasks;
         let task;
-        match tasks.values.pop() {
+        match tasks.pop_task() {
             Some(t) => task = t,
             None => return Err(SolLearnError::NoValidTask.into()),
         }
-        if task.fn_type != 0 {
+        if task.fn_type() != FnType::CreateAssignment {
             return Err(SolLearnError::NoValidTask.into());
         }
-        let data = task.data;
+        let data = task.data();
         let mut assignment_id_bytes = [0u8; 8];
         assignment_id_bytes.copy_from_slice(&data[0..8]);
         let check_assignment_id = u64::from_le_bytes(assignment_id_bytes);
@@ -973,7 +976,8 @@ pub mod solearn {
                 data.push(1);
                 data.extend_from_slice(&inference.processed_miner.to_bytes());
 
-                tasks.values.push(Task { fn_type: 2, data });
+                tasks.push_task(Task::new(FnType::SlashMiner, data));
+
             }
         } else if inference.status == 2 {
             if Clock::get()?.slot > inference.commit_timeout {
@@ -1009,7 +1013,7 @@ pub mod solearn {
                         data.push(0);
                         data.push(1);
                         data.push(0);
-                        tasks.values.push(Task { fn_type: 2, data });
+                        tasks.push_task(Task::new(FnType::SlashMiner, data));
                     }
                 }
             }
@@ -1049,7 +1053,7 @@ pub mod solearn {
                             data.push(0);
                             data.push(0);
                             data.push(0);
-                            tasks.values.push(Task { fn_type: 2, data });
+                            tasks.push_task(Task::new(FnType::SlashMiner, data));
                         }
                     }
                     inference.status = 4;
@@ -1070,14 +1074,14 @@ pub mod solearn {
         let assignment = &mut ctx.accounts.assignment;
 
         let task;
-        match tasks.values.pop() {
+        match tasks.pop_task() {
             Some(t) => task = t,
             None => return Err(SolLearnError::NoValidTask.into()),
         }
-        if task.fn_type != 1 {
+        if task.fn_type() != FnType::PayMiner {
             return Err(SolLearnError::NoValidTask.into());
         }
-        let data = task.data;
+        let data = task.data();
         let use_assignment = data[0] == 1;
         let value = if use_assignment {
             let _assignment_id = u64::from_le_bytes(data[1..9].try_into().unwrap());
@@ -1157,14 +1161,14 @@ pub mod solearn {
 
         let tasks = &mut ctx.accounts.tasks;
         let task;
-        match tasks.values.pop() {
+        match tasks.pop_task() {
             Some(t) => task = t,
             None => return Err(SolLearnError::NoValidTask.into()),
         }
-        if task.fn_type != 2 {
+        if task.fn_type() != FnType::SlashMiner {
             return Err(SolLearnError::NoValidTask.into());
         }
-        let data = task.data;
+        let data = task.data();
         let slashing_processed_miner = data[0] == 1;
         let token_fine = if slashing_processed_miner {
             let mut pubkey_bytes = [0u8; 32];

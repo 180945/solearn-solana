@@ -47,7 +47,7 @@ pub struct InitializeExtra<'info> {
     #[account(
         init, 
         payer = admin, 
-        space = 8 + 8,
+        space = 1024,
         seeds = [b"tasks", sol_learn_account.key().as_ref()], 
         bump
     )]

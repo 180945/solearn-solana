@@ -223,7 +223,7 @@ pub fn filter_commitment(
             data.push(0);
             data.push(0);
             data.push(1);
-            tasks.values.push(Task { fn_type: 2, data });
+            tasks.push_task(Task::new(FnType::SlashMiner, data));
         } else {
             // assignment.vote = 2; // Vote::Approval
             if assignment.role == 1 {
@@ -234,7 +234,7 @@ pub fn filter_commitment(
                     data.extend_from_slice(&assignment.id.to_le_bytes());
                     data.extend_from_slice(&share_fee_per_validator.to_le_bytes());
                     data.push(2);
-                    tasks.values.push(Task { data, fn_type: 1 });
+                    tasks.push_task(Task::new(FnType::PayMiner, data));
                 }
                 if not_reached_limit && token_for_miner > 0 {
                     dao_receivers.values.insert(
@@ -257,7 +257,7 @@ pub fn filter_commitment(
                     data.extend_from_slice(&assignment.id.to_le_bytes());
                     data.extend_from_slice(&fee_for_miner.to_le_bytes());
                     data.push(2);
-                    tasks.values.push(Task { data, fn_type: 1 });
+                    tasks.push_task(Task::new(FnType::PayMiner, data));
                 }
                 if not_reached_limit && token_for_miner > 0 {
                     dao_receivers.values.insert(
@@ -295,14 +295,15 @@ pub fn filter_commitment(
         data.push(0);
         data.extend(acc.l2_owner.to_bytes());
         data.extend_from_slice(&inference.fee_l2.to_le_bytes());
-        tasks.values.push(Task { data, fn_type: 1 });
+        tasks.push_task(Task::new(FnType::PayMiner, data));
+    
     }
     if inference.fee_treasury > 0 {
         let mut data = vec![];
         data.push(0);
         data.extend(acc.treasury.to_bytes());
         data.extend_from_slice(&inference.fee_treasury.to_le_bytes());
-        tasks.values.push(Task { data, fn_type: 1 });
+        tasks.push_task(Task::new(FnType::PayMiner, data));
     }
 
     inference.status = 4;

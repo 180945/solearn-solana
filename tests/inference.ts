@@ -56,10 +56,15 @@ export async function initProgram(_s) {
     [_s.tokenMintA, _s.tokenMintB].map((mint) => getAssociatedTokenAddressSync(mint.publicKey, keypair.publicKey, false, TOKEN_PROGRAM)),
   );
 
+  const [eveTkn1, eveTkn2, domTkn1, domTkn2] = [_s.eve, _s.dom].flatMap((keypair) =>
+    [_s.tokenMintA, _s.tokenMintB].map((mint) => getAssociatedTokenAddressSync(mint.publicKey, keypair.publicKey, false, TOKEN_PROGRAM)),
+  );
+  Object.assign(_s, { aliceTokenAccountA, eveTkn1, eveTkn2, domTkn1, domTkn2 });
+
   // Airdrops to users, and creates two tokens mints 'A' and 'B'"
   const minimumLamports = await getMinimumBalanceForRentExemptMint(_s.connection);
 
-  const sendSolInstructions: Array<TransactionInstruction> = [_s.admin, _s.alice, _s.bob].map((account) =>
+  const sendSolInstructions: Array<TransactionInstruction> = [_s.admin, _s.alice, _s.bob, _s.eve, _s.dom].map((account) =>
     SystemProgram.transfer({
       fromPubkey: _s.provider.publicKey,
       toPubkey: account.publicKey,
@@ -82,24 +87,30 @@ export async function initProgram(_s) {
     {
       mint: _s.tokenMintA.publicKey,
       authority: _s.alice.publicKey,
-      ata: aliceTokenAccountA,
+      ataDetails: [{ ata: aliceTokenAccountA, owner: _s.alice.publicKey }, { ata: eveTkn1, owner: _s.eve.publicKey }, { ata: domTkn1, owner: _s.dom.publicKey }],
     },
     {
       mint: _s.tokenMintB.publicKey,
       authority: _s.bob.publicKey,
-      ata: bobTokenAccountB,
-    },
+      ataDetails: [{ ata: bobTokenAccountB, owner: _s.bob.publicKey }],
+    }
   ].flatMap((mintDetails) => [
     createInitializeMint2Instruction(mintDetails.mint, 6, mintDetails.authority, null, TOKEN_PROGRAM),
-    createAssociatedTokenAccountIdempotentInstruction(_s.provider.publicKey, mintDetails.ata, mintDetails.authority, mintDetails.mint, TOKEN_PROGRAM),
-    createMintToInstruction(mintDetails.mint, mintDetails.ata, mintDetails.authority, 1_000_000_000, [], TOKEN_PROGRAM),
+    ...(mintDetails.ataDetails.map(d => createAssociatedTokenAccountIdempotentInstruction(_s.provider.publicKey, d.ata, d.owner, mintDetails.mint, TOKEN_PROGRAM))),
+    ...(mintDetails.ataDetails.map(d => createMintToInstruction(mintDetails.mint, d.ata, mintDetails.authority, 1_000_000_000, [], TOKEN_PROGRAM))),
   ]);
 
   // Add all these instructions to our transaction
   let tx = new Transaction();
-  tx.instructions = [...sendSolInstructions, ...createMintInstructions, ...mintTokensInstructions];
+  tx.instructions = [...sendSolInstructions];
 
+  console.log('before sendAndConfirm', [_s.tokenMintA, _s.tokenMintB, _s.alice, _s.bob, _s.eve, _s.dom].map((a) => a.publicKey.toBase58()))
+  await _s.provider.sendAndConfirm(tx, []);
+  tx = new Transaction();
+  console.log('before sendAndConfirm2')
+  tx.instructions = [...createMintInstructions, ...mintTokensInstructions];
   await _s.provider.sendAndConfirm(tx, [_s.tokenMintA, _s.tokenMintB, _s.alice, _s.bob]);
+  console.log('before sendAndConfirm3')
 
   _s.accounts.admin = _s.admin.publicKey;
   _s.accounts.stakingToken = _s.tokenMintA.publicKey;
@@ -119,6 +130,7 @@ export async function initProgram(_s) {
     [Buffer.from('tasks'), _s.solearnAccount.publicKey.toBuffer()],
     _s.program.programId,
   )[0];
+  console.log('before initialize')
 
   const zeroValue = new BN(0);
   await sendAndConfirmTx(_s.provider, [await _s.program.instruction.initialize(
@@ -143,6 +155,7 @@ export async function initProgram(_s) {
     }
   )], [_s.admin, _s.solearnAccount]);
   _s.accounts.signer = _s.admin.publicKey;
+  console.log('before initialize2')
   await sendAndConfirmTx(_s.provider, [await _s.program.instruction.initialize2(
     {
       accounts: { ..._s.accounts }
@@ -279,23 +292,52 @@ describe('Solearn Bankrun example', function () {
   async function simulateInferAndAssign(_s) {
     const workerHub = _s.program;
 
-    // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.minerRegister(new BN(100000000),
+    _s.accounts.signer = _s.alice.publicKey;
+    console.log('gagaagaggaga', 1);
+    // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.minerRegister(
+    //   new BN(100000000),
     //   {
     //     accounts: { ..._s.accounts }
-    //   })], [_s.eve]);
+    //   }
+    // )], [_s.alice]);
+    console.log('gagaagaggaga', 2);
+    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.joinForMinting(
+      {
+        accounts: { ..._s.accounts }
+      }
+    )], [_s.alice]);
 
-    // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.joinForMinting({
-    //   accounts: { ..._s.accounts }
-    // })], [_s.eve]);
+    _s.accounts.signer = _s.eve.publicKey;
+    _s.accounts.miner = _s.eve.publicKey;
+    _s.accounts.minerAccount = PublicKey.findProgramAddressSync(
+      [Buffer.from('miner'), _s.accounts.miner.toBuffer(), _s.accounts.solLearnAccount.toBuffer()],
+      _s.program.programId,
+    )[0];
+    _s.accounts.minerStakingWallet = _s.eveTkn1;
+    await sendAndConfirmTx(_s.provider, [createAssociatedTokenAccountIdempotentInstruction(_s.eve.publicKey, _s.accounts.vaultStakingWallet, _s.accounts.vaultWalletOwnerPda, _s.tokenMintA.publicKey, TOKEN_PROGRAM), await workerHub.instruction.minerRegister(new BN(100000000),
+      {
+        accounts: { ..._s.accounts }
+      })], [_s.eve]);
 
-    // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.minerRegister(new BN(100000000),
-    //   {
-    //     accounts: { ..._s.accounts }
-    //   })], [_s.dom]);
+    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.joinForMinting({
+      accounts: { ..._s.accounts }
+    })], [_s.eve]);
 
-    // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.joinForMinting({
-    //   accounts: { ..._s.accounts }
-    // })], [_s.dom]);
+    _s.accounts.signer = _s.dom.publicKey;
+    _s.accounts.miner = _s.dom.publicKey;
+    _s.accounts.minerAccount = PublicKey.findProgramAddressSync(
+      [Buffer.from('miner'), _s.accounts.miner.toBuffer(), _s.accounts.solLearnAccount.toBuffer()],
+      _s.program.programId,
+    )[0];
+    _s.accounts.minerStakingWallet = _s.domTkn1;
+    await sendAndConfirmTx(_s.provider, [createAssociatedTokenAccountIdempotentInstruction(_s.dom.publicKey, _s.accounts.vaultStakingWallet, _s.accounts.vaultWalletOwnerPda, _s.tokenMintA.publicKey, TOKEN_PROGRAM), await workerHub.instruction.minerRegister(new BN(100000000),
+      {
+        accounts: { ..._s.accounts }
+      })], [_s.dom]);
+
+    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.joinForMinting({
+      accounts: { ..._s.accounts }
+    })], [_s.dom]);
 
     // expect((await workerHub.getMinerAddresses()).length).to.eq(18);
     // simulate contract model call to worker hub to create inference
@@ -305,17 +347,13 @@ describe('Solearn Bankrun example', function () {
     // )) as HybridModel;
     const creator = _s.alice.publicKey;
     _s.accounts.signer = _s.alice.publicKey;
+    _s.accounts.miner = _s.alice.publicKey;
+    _s.accounts.minerAccount = PublicKey.findProgramAddressSync(
+      [Buffer.from('miner'), _s.accounts.miner.toBuffer(), _s.accounts.solLearnAccount.toBuffer()],
+      _s.program.programId,
+    )[0];
+    _s.accounts.minerStakingWallet = _s.aliceTokenAccountA;
     let num = new BN(1);
-
-    // _s.accounts.data = PublicKey.findProgramAddressSync(
-    //   [Buffer.from('smol'), num.toBuffer('le', 8)],
-    //   _s.program.programId,
-    // )[0];
-    // let res = await sendAndConfirmTx(_s.provider, [await workerHub.instruction.callSmall(num,
-    //   {
-    //     accounts: { ..._s.accounts }
-    //   })], [_s.alice]);
-    // console.log('done call small', res);
     
     _s.accounts.infs = PublicKey.findProgramAddressSync(
       [Buffer.from('inference'), num.toBuffer('le', 8)],
