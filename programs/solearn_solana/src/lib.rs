@@ -453,17 +453,41 @@ pub mod solearn {
 
     pub fn next_inference_id(ctx: Context<ReadStateVld>) -> Result<u64> {
         let acc = &ctx.accounts.sol_learn_account;
-        Ok(acc.inference_number)
+        Ok(acc.inference_number + 1)
     }
 
     pub fn next_assignment_id(ctx: Context<ReadStateVld>) -> Result<u64> {
         let acc = &ctx.accounts.sol_learn_account;
-        Ok(acc.assignment_number)
+        Ok(acc.assignment_number + 1)
     }
 
     pub fn next_epoch_id(ctx: Context<ReadStateVld>) -> Result<u64> {
         let acc = &ctx.accounts.sol_learn_account;
         Ok(acc.last_epoch + 1)
+    }
+
+    pub fn get_task_count(ctx: Context<ReadTasksVld>) -> Result<u64> {
+        let t = &ctx.accounts.tasks;
+        Ok((t.values.len() as u64) / 50)
+    }
+
+    pub fn get_assignment(ctx: Context<ReadAssignmentVld>, assignment_id: u64, field_name: String) -> Result<Vec<u8>> {
+        let asgnmt = &ctx.accounts.assignment;
+        if asgnmt.id != assignment_id {
+            return Err(SolLearnError::Unauthorized.into());
+        }
+
+        match field_name.as_str() {
+            "inference_id" => Ok(asgnmt.inference_id.to_le_bytes().to_vec()),
+            "worker" => Ok(asgnmt.worker.to_bytes().to_vec()),
+            "role" => Ok(vec![asgnmt.role]),
+            "vote" => Ok(vec![asgnmt.vote]),
+            "reveal_nonce" => Ok(asgnmt.reveal_nonce.to_le_bytes().to_vec()),
+            "output" => Ok(asgnmt.output.to_vec()),
+            "commitment" => Ok(asgnmt.commitment.to_vec()),
+            "digest" => Ok(asgnmt.digest.to_vec()),
+            _ => Err(SolLearnError::UnknownStructField.into()),
+        }
     }
 
     pub fn update_epoch(ctx: Context<UpdateEpochVld>, epoch_id: u64) -> Result<()> {
@@ -580,11 +604,17 @@ pub mod solearn {
             );
 
             let miner_ind = (rand_uint as usize) % miners_len;
+            msg!("all miners_of_model {:?} and #{} was chosen", miners_of_model.data.clone(), miner_ind);
+
             let miner_bytes = miners_of_model.data.drain(miner_ind*32..(miner_ind+1)*32).collect::<Vec<u8>>();
             let miner = Pubkey::new_from_array(miner_bytes.try_into().unwrap());
+            msg!("miner chosen: {:?}", miner);
 
-            let assignment_id = acc.assignment_number;
+
+
             acc.assignment_number += 1;
+            let assignment_id = acc.assignment_number;
+            
             let mut data = vec![];
             data.extend_from_slice(&assignment_id.to_le_bytes());
             data.extend_from_slice(&inference_id.to_le_bytes());
@@ -602,12 +632,6 @@ pub mod solearn {
         for miner in selected_miners {
             miners_of_model.data.extend_from_slice(miner.to_bytes().as_ref());
         }
-        emit!(NewInference {
-            inference_id,
-            creator,
-            model_address: model,
-            value,
-        });
         
         let cpi_accounts = Transfer {
             from: ctx.accounts.miner_staking_wallet.to_account_info(),
@@ -618,6 +642,13 @@ pub mod solearn {
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
 
         token::transfer(cpi_ctx, _value)?;
+
+        emit!(NewInference {
+            inference_id,
+            creator,
+            model_address: model,
+            value,
+        });
 
         Ok(0)
     }
@@ -650,6 +681,8 @@ pub mod solearn {
         assignment.inference_id = inference_id;
         assignment.worker = worker;
         assignment.role = role;
+        assignment.bump = ctx.bumps.assignment;
+        assignment.id = assignment_id;
 
         emit!(NewAssignment {
             assignment_id,
@@ -660,20 +693,11 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn top_up_infer(ctx: Context<UpdateInferVld>, inference_id: u64, value: u64) -> Result<()> {
+    pub fn topup_infer(ctx: Context<UpdateInferVld>, inference_id: u64, value: u64) -> Result<()> {
         if value == 0 {
             return Err(SolLearnError::ZeroValue.into());
         }
-
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.miner_staking_wallet.to_account_info(),
-            to: ctx.accounts.vault_staking_wallet.to_account_info(),
-            authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        token::transfer(cpi_ctx, value)?;
-
+        
         // let from = ctx.accounts.signer.to_account_info();
         // let to = ctx.accounts.vault_wallet_owner_pda.to_account_info();
         // if **from.try_borrow_lamports()? < value {
@@ -691,6 +715,16 @@ pub mod solearn {
         }
 
         inference.value += value;
+
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.miner_staking_wallet.to_account_info(),
+            to: ctx.accounts.vault_staking_wallet.to_account_info(),
+            authority: ctx.accounts.signer.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        token::transfer(cpi_ctx, value)?;
+
         emit!(TopUpInfer {
             inference_id,
             creator: ctx.accounts.signer.key(),
@@ -700,7 +734,7 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn seize_miner_role(ctx: Context<UpdateAssignmentVld>, assignment_id: u64) -> Result<()> {
+    pub fn seize_miner_role(ctx: Context<UpdateAssignmentVld>, assignment_id: u64, inference_id: u64) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
         let inference = &mut ctx.accounts.infs;
         let assignment = &mut ctx.accounts.assignment;
@@ -715,7 +749,10 @@ pub mod solearn {
             return Err(SolLearnError::Unauthorized.into());
         }
 
-        let _infer_id = assignment.inference_id;
+        if inference_id != assignment.inference_id {
+            return Err(SolLearnError::Unauthorized.into());
+        }
+
         if inference.processed_miner != Pubkey::default() {
             return Err(SolLearnError::InferenceSeized.into());
         }
@@ -725,7 +762,7 @@ pub mod solearn {
 
         emit!(MinerRoleSeized {
             assignment_id,
-            inference_id: _infer_id,
+            inference_id: inference_id,
             sender: ctx.accounts.signer.key(),
         });
 

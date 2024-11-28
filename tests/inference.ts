@@ -39,6 +39,22 @@ export async function sendAndConfirmTx(providerAgr: any, insts: any, signers: an
   await providerAgr.sendAndConfirm(initTx, signers);
 }
 
+export async function simulateTx(providerAgr: any, insts: any, signers: any) {
+  const initTx = new Transaction();
+  initTx.instructions = [...insts];
+  return await providerAgr.simulate(initTx, signers);
+}
+
+export async function simulateAndGetResponse(providerAgr: any, insts: any, signers: any) {
+  const resp = await simulateTx(providerAgr, insts, signers);
+  if (resp.returnData.data[1] === 'base64') {
+    return Buffer.from(resp.returnData.data[0], 'base64');
+  } else {
+    console.error(resp.returnData.data[1]);
+    throw new Error('Unsupported return data encoding');
+  }
+}
+
 // We'll call this function from multiple tests, so let's seperate it out
 export async function stake() {
   // fill in here
@@ -353,10 +369,10 @@ describe('Solearn Bankrun example', function () {
       _s.program.programId,
     )[0];
     _s.accounts.minerStakingWallet = _s.aliceTokenAccountA;
-    let num = new BN(1);
+    let infId = new BN(1);
     
     _s.accounts.infs = PublicKey.findProgramAddressSync(
-      [Buffer.from('inference'), num.toBuffer('le', 8)],
+      [Buffer.from('inference'), infId.toBuffer('le', 8)],
       _s.program.programId,
     )[0];
     _s.accounts.referrer = PublicKey.findProgramAddressSync(
@@ -366,17 +382,73 @@ describe('Solearn Bankrun example', function () {
 
     const modelInput = Buffer.from(randomBytes(32));
     
-    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.infer(num, creator,
+    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.infer(infId, creator,
       modelInput, new BN(100000), _s.model1.publicKey,
       {
         accounts: { ..._s.accounts }
       })], [_s.alice]);
 
+    console.log('infer call finished')
+    // TODO: assert token balances
     // const blockNumber = await getBlockNumber();
     // const block = await getBlock(blockNumber);
     // const blockTime = block?.timestamp || 0;
     // expect inference id to be 1
-    expect(await workerHub.instruction.nextInferenceId()).to.eq(1);
+    
+    const nextInfId = new BN(
+      await simulateAndGetResponse(_s.provider,
+        [await workerHub.instruction.nextInferenceId({ accounts: { ..._s.accounts } })],
+        [_s.provider.wallet.payer]
+      ),
+      undefined, 'le',
+    );
+    // console.log('next_inf_id', nextInfId);
+    expect(nextInfId.toNumber()).to.eq(2);
+
+    let taskCount = new BN(
+      await simulateAndGetResponse(_s.provider,
+        [await workerHub.instruction.getTaskCount({ accounts: { ..._s.accounts } })],
+        [_s.provider.wallet.payer]
+      ),
+      undefined, 'le',
+    );
+    console.log('after calling infer, taskCount =', taskCount.toNumber());
+    expect(taskCount.toNumber()).to.eq(1);
+
+    let assignmentId = new BN(1);
+    _s.accounts.assignment = PublicKey.findProgramAddressSync(
+      [Buffer.from('assignment'), assignmentId.toBuffer('le', 8)],
+      _s.program.programId,
+    )[0];
+    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.createAssignment(assignmentId,
+      {
+        accounts: { ..._s.accounts }
+      })], [_s.alice]);
+
+    taskCount = new BN(
+      await simulateAndGetResponse(_s.provider,
+        [await workerHub.instruction.getTaskCount({ accounts: { ..._s.accounts } })],
+        [_s.provider.wallet.payer]
+      ),
+      undefined, 'le',
+    );
+    console.log('after calling createAssignment, taskCount =', taskCount.toNumber());
+    expect(taskCount.toNumber()).to.eq(0);
+
+    const buf = await simulateAndGetResponse(_s.provider,
+      [await workerHub.instruction.getAssignment(assignmentId, "worker", { accounts: { ..._s.accounts } })],
+      [_s.provider.wallet.payer]
+    );
+    let len = buf.readUInt32LE(0);
+    if (len > 4 + buf.length) {
+      throw new Error('Invalid getAssignment data length');
+    }
+    const readData = buf.subarray(4, 4 + len);
+    let assignedWorkerPubkey = new PublicKey(
+      readData
+    );
+    // console.log('assignedWorkerPubkey', assignedWorkerPubkey.toBase58());
+    // console.log('vs potential miners', _s.alice.publicKey.toBase58(), _s.eve.publicKey.toBase58(), _s.dom.publicKey.toBase58());
 
     // const inferInfo = await workerHub.instruction.getInferenceInfo(1n);
     //check inference info
@@ -387,25 +459,66 @@ describe('Solearn Bankrun example', function () {
     // expect(inferInfo.commitTimeout).to.eq(blockTime + 600 * 2);
     // expect(inferInfo.revealTimeout).to.eq(blockTime + 600 * 3);
 
-    // find the assigned workers
-    const assigns = await workerHub.instruction.nextAssignmentId();
-    console.log('assigns', assigns);
-    const assignedMiners = assigns.map((a) => a.worker);
-    expect(assignedMiners.length).to.eq(3);
+    const nextAssignmentId = new BN(
+      await simulateAndGetResponse(_s.provider,
+        [await workerHub.instruction.nextAssignmentId({ accounts: { ..._s.accounts } })],
+        [_s.provider.wallet.payer]
+      ),
+      undefined, 'le',
+    );
+    // console.log('next_a_id', nextAssignmentId);
+    expect(nextAssignmentId.toNumber()).to.eq(2);
+
+    const assignedMiners = [_s.alice, _s.eve, _s.dom].filter((miner) => miner.publicKey.toBase58() === assignedWorkerPubkey.toBase58());
+    expect(assignedMiners.length).to.eq(1);
 
     return assignedMiners;
   }
 
   describe('Test staking', async function () {
-
+    let assignedMiner;
     
     it('should call infer and get assigned', async function () {
-      // setup
       await initProgram(state);
-      await simulateInferAndAssign(state);
+      const res = await simulateInferAndAssign(state);
+      console.log('infer & assigned', res.map(m => m.publicKey.toBase58()));
+      assignedMiner = res[0];
+    });
+
+    it('should topup inference', async function () {
+      console.log('begin topup inference');
+      state.accounts.signer = state.alice.publicKey;
+      state.accounts.miner = state.alice.publicKey;
+      state.accounts.minerAccount = PublicKey.findProgramAddressSync(
+        [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
+        state.program.programId,
+      )[0];
+      await sendAndConfirmTx(state.provider, [await state.program.instruction.topupInfer(
+        new BN(1),
+        new BN(100000000),
+        {
+          accounts: { ...state.accounts }
+        }
+      )], [state.alice]);
     });
     it("should seize the miner role", async () => {
-
+      state.accounts.signer = assignedMiner.publicKey;
+      state.accounts.miner = assignedMiner.publicKey;
+      state.accounts.minerAccount = PublicKey.findProgramAddressSync(
+        [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
+        state.program.programId,
+      )[0];
+      state.accounts.votingInfo = PublicKey.findProgramAddressSync(
+        [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
+        state.program.programId,
+      )[0];     
+      await sendAndConfirmTx(state.provider, [await state.program.instruction.seizeMinerRole(
+        new BN(1),
+        new BN(1),
+        {
+          accounts: { ...state.accounts }
+        }
+      )], [assignedMiner]);
     });
     
   });

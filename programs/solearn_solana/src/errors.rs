@@ -57,4 +57,6 @@ pub enum SolLearnError {
     StakingZeroValue,
     #[msg("Invalid model index")]
     InvalidModelIndex,
+    #[msg("Unknown struct field")]
+    UnknownStructField,
 }
