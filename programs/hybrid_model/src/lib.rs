@@ -11,7 +11,7 @@ use errors::*;
 use state::*;
 use utils::*;
 
-declare_id!("7MHr6ZPGTWZkRk6m52GfEWoMxSV7EoDjYyoXAYf3MBwS");
+declare_id!("GJDRVDToZqT6ZQZ74TreUqm4tvR8yYhUcMwYKMHucoen");
 
 #[program]
 pub mod hybrid_model {
@@ -107,20 +107,22 @@ pub mod hybrid_model {
             infs: ctx.accounts.infs.to_account_info(),
             system_program: ctx.accounts.system_program.to_account_info(), // Add missing field
             sol_learn_account: ctx.accounts.sol_learn_account.to_account_info(), // Add missing field
-            assignment: ctx.accounts.assignment.to_account_info(), // Add missing field
-            miner_addresses: ctx.accounts.miner_addresses.to_account_info(), // Add missing field
+            // assignment: ctx.accounts.assignment.to_account_info(), // Add missing field
+            // miner_addresses: ctx.accounts.miner_addresses.to_account_info(), // Add missing field
             tasks: ctx.accounts.tasks.to_account_info(), // Add missing field
             signer: ctx.accounts.signer.to_account_info(), // Add missing field
             vault_wallet_owner_pda: ctx.accounts.vault_wallet_owner_pda.to_account_info(), // Add missing field
             miner_staking_wallet: ctx.accounts.miner_staking_wallet.to_account_info(),
             models: ctx.accounts.models.to_account_info(),
-            referrer: ctx.accounts.referrer.to_account_info(),
+            // referrer: ctx.accounts.referrer.to_account_info(),
             token_program: ctx.accounts.token_program.to_account_info(),
             vault_staking_wallet: ctx.accounts.vault_staking_wallet.to_account_info(),
-            miners_of_model: ctx.accounts.miner_addresses.to_account_info(),
+            miners_of_model: ctx.accounts.miners_of_model.to_account_info(),
+            dao_receiver_infos: ctx.accounts.miners_of_model.to_account_info(),
+            voting_info: ctx.accounts.miners_of_model.to_account_info(),
         };
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        solearn_solana::cpi::infer(cpi_ctx, input, creator, _value, inference_id, ctx.accounts.models.key())?;
+        solearn_solana::cpi::infer(cpi_ctx, inference_id, creator, input, _value, ctx.accounts.models.key())?;
         Ok(())
     }
 }

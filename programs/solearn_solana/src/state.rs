@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-use crate::{DAOTokenPercentage, Pubkeys, WorkerHubStorage};
+use crate::{DAOTokenPercentage, Tasks};
 
 // init pda to store list of models
 #[derive(Accounts)]
@@ -28,14 +28,35 @@ pub struct Initialize<'info> {
     )]
     pub models: Account<'info, Models>,
     #[account(
-        init,
+        init, 
+        // realloc = 8 + wh_account.len(),
+        // realloc::payer = admin, 
+        // realloc::zero = false,
         payer = admin, 
-        space = 8 + WorkerHubStorage::LEN,
+        space = 8 + SolLearnInfo::LEN,
     )]
-    pub sol_learn_account: Account<'info, WorkerHubStorage>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
 }
+
+#[derive(Accounts)]
+pub struct InitializeExtra<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    #[account(
+        init, 
+        payer = admin, 
+        space = 1024,
+        seeds = [b"tasks", sol_learn_account.key().as_ref()], 
+        bump
+    )]
+    pub tasks: Box<Account<'info, Tasks>>,
+    #[account(mut, constraint = sol_learn_account.admin == admin.key())]
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
+    pub system_program: Program<'info, System>,
+}
+
 
 #[derive(Accounts)]
 #[instruction(model: Pubkey)]
@@ -44,14 +65,14 @@ pub struct AddModel<'info> {
     pub admin: Signer<'info>,
     /// CHECK:
     #[account(mut, constraint = sol_learn_account.admin == admin.key())]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(
         mut,
         realloc = 8 + Models::LEN + models.data.len() + 32,
         realloc::payer = admin,
         realloc::zero = false,
-        seeds = [b"models", sol_learn_account.key().as_ref()], 
-        bump = models.bump,
+        // seeds = [b"models", sol_learn_account.key().as_ref()], 
+        // bump = models.bump,
     )]
     pub models: Account<'info, Models>,
     #[account(
@@ -61,7 +82,7 @@ pub struct AddModel<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref(), model.key().as_ref()], 
         bump
     )]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     pub system_program: Program<'info, System>,
 }
 
@@ -72,14 +93,14 @@ pub struct RemoveModel<'info> {
     pub admin: Signer<'info>,
     /// CHECK:
     #[account(mut, constraint = sol_learn_account.admin == admin.key())]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(
         mut,
-        realloc = 8 + 1 + 4 + models.data.len() + 32,
+        realloc = 8 + 1 + 4 + 8 + 8 + models.data.len() + 32,
         realloc::payer = admin,
         realloc::zero = false,
-        seeds = [b"models", sol_learn_account.key().as_ref()], 
-        bump = models.bump,
+        // seeds = [b"models", sol_learn_account.key().as_ref()], 
+        // bump = models.bump,
     )]
     pub models: Account<'info, Models>,
     #[account(
@@ -88,7 +109,7 @@ pub struct RemoveModel<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref(), model.key().as_ref()], 
         bump = miners_of_model.bump
     )]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     pub system_program: Program<'info, System>,
 }
 
@@ -98,10 +119,10 @@ pub struct MinerRegister<'info> {
     pub miner: Signer<'info>,
     /// CHECK:
     #[account(mut)]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(
-        seeds = [b"models", sol_learn_account.key().as_ref()], 
-        bump = models.bump,
+        // seeds = [b"models", sol_learn_account.key().as_ref()], 
+        // bump = models.bump,
     )]
     pub models: Account<'info, Models>,
     #[account(
@@ -135,7 +156,7 @@ pub struct Topup<'info> {
     pub miner: Signer<'info>,
     /// CHECK:
     #[account()]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
@@ -162,7 +183,7 @@ pub struct MinerUnStaking<'info> {
     pub miner: Signer<'info>,
     /// CHECK:
     #[account()]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
@@ -174,7 +195,7 @@ pub struct MinerUnStaking<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
         bump = miners_of_model.bump,
     )]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
 }
@@ -185,7 +206,7 @@ pub struct MinerClaimReward<'info> {
     pub miner: Signer<'info>,
     /// CHECK:
     #[account()]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
@@ -214,7 +235,7 @@ pub struct MinerClaim<'info> {
     pub miner: Signer<'info>,
     /// CHECK:
     #[account()]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(
         mut,
         seeds = [b"miner", miner.key().as_ref(), sol_learn_account.key().as_ref()], 
@@ -241,7 +262,7 @@ pub struct MinerClaim<'info> {
 pub struct JoinForMinting<'info> {
     #[account(mut)]
     pub miner: Signer<'info>,
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     /// CHECK:
     #[account(
         mut,
@@ -257,7 +278,7 @@ pub struct JoinForMinting<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
         bump = miners_of_model.bump
     )]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     pub models: Account<'info, Models>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
@@ -271,6 +292,7 @@ pub struct SolLearnInfo {
     pub total_miner: u64,
     pub total_models: u64,
     pub total_infer: u64,
+    pub miner_minimum_stake: u64,
     pub unstake_delay_time: u64,
     pub reward_per_epoch: u64,
     pub min_fee_to_use: u64,
@@ -280,7 +302,6 @@ pub struct SolLearnInfo {
 
     pub inference_number: u64,
     pub assignment_number: u64,
-    pub miner_minimum_stake: u64,
     pub l2_owner: Pubkey,
     pub treasury: Pubkey,
     pub fee_l2_percentage: u16,
@@ -308,6 +329,7 @@ pub struct MinerInfo {
     pub bump: u8,
     pub miner: Pubkey,
     pub model: Pubkey,
+    pub model_index: u64, // plus one already to make sure > 0
     pub stake_amount: u64,
     pub last_epoch: u64,
     pub active_time: u64,
@@ -317,7 +339,7 @@ pub struct MinerInfo {
 }
 
 impl MinerInfo {
-    pub const LEN: usize = 1 + 32 + 32 + 8 * 6 + 1;
+    pub const LEN: usize = 1 + 32 + 32 + 8 + 8 + 8 + 8 + 1 + 8 + 8;
 }
 
 #[account]
@@ -329,18 +351,16 @@ impl VaultAccount {
     pub const LEN: usize = 8;
 }
 
-// todo: review this again
-// models accounts's purpose is to contain only list of models
 #[account]
 pub struct Models {
-    pub bump: u8, 
+    // pub bump: u8, 
     pub data: Vec<u8>,
-    pub minimum_fee: u64,
-    pub tier: u32,
+    // pub minimum_fee: u64,
+    // pub tier: u32,
 }
 
 impl Models {
-    pub const LEN: usize = 1 + 4 + 8 + 4;
+    pub const LEN: usize = 1 + 4 + 8 + 8;
 }
 
 #[account]
