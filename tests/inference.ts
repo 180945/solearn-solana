@@ -283,7 +283,7 @@ describe('Solearn Bankrun example', function () {
   };
   let state = {
     admin, alice, bob, eve, dom, tokenMintA, tokenMintB, solearnAccount, model1, model2,
-    context, provider, connection, program, hmProgram, accounts
+    context, provider, connection, program, hmProgram, accounts, aliceTokenAccountA: undefined
   };
   
 
@@ -361,7 +361,7 @@ describe('Solearn Bankrun example', function () {
     //   "HybridModel",
     //   hybridModelAddress
     // )) as HybridModel;
-    const creator = _s.alice.publicKey;
+    // const creator = _s.aliceTokenAccountA.publicKey;
     _s.accounts.signer = _s.alice.publicKey;
     _s.accounts.miner = _s.alice.publicKey;
     _s.accounts.minerAccount = PublicKey.findProgramAddressSync(
@@ -376,13 +376,13 @@ describe('Solearn Bankrun example', function () {
       _s.program.programId,
     )[0];
     _s.accounts.referrer = PublicKey.findProgramAddressSync(
-      [Buffer.from('referrer'), creator.toBuffer()],
+      [Buffer.from('referrer'), _s.alice.publicKey.toBuffer()],
       _s.program.programId,
     )[0];
 
     const modelInput = Buffer.from(randomBytes(32));
     
-    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.infer(infId, creator,
+    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.infer(infId, _s.aliceTokenAccountA,
       modelInput, new BN(100000), _s.model1.publicKey,
       {
         accounts: { ..._s.accounts }
@@ -551,13 +551,34 @@ describe('Solearn Bankrun example', function () {
         [Buffer.from('voting_info'), new BN(inferenceId).toBuffer('le', 8)],
         state.program.programId,
       )[0];         
+      
       const solution = Buffer.from("solution for test");
       await sendAndConfirmTx(state.provider, [await state.program.instruction.submitSolution(new BN(inferenceId), new BN(assignmentId), solution, {
         accounts: { ...state.accounts }
       })], [assignedMiner]);
     });
       
-    
+    it("should resolve inference", async () => {
+      state.accounts.signer = state.alice.publicKey;
+      state.accounts.miner = state.alice.publicKey;
+      state.accounts.minerAccount = PublicKey.findProgramAddressSync(
+        [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
+        state.program.programId,
+      )[0];
+      state.accounts.daoReceiverInfos = PublicKey.findProgramAddressSync(
+        [Buffer.from('dao_receiver_infos'), state.accounts.solLearnAccount.toBuffer(), new BN(inferenceId).toBuffer('le', 8)],
+        state.program.programId,
+      )[0]; 
+      state.accounts.votingInfo = PublicKey.findProgramAddressSync(
+        [Buffer.from('voting_info'), new BN(inferenceId).toBuffer('le', 8)],
+        state.program.programId,
+      )[0];         
+      state.accounts.tokenRecipient = state.aliceTokenAccountA;
+      console.log('state.accounts.solLearnAccount', state.accounts.solLearnAccount.toBase58(), state.accounts.tokenRecipient);
+      await sendAndConfirmTx(state.provider, [await state.program.instruction.resolveInference(new BN(inferenceId), new BN(assignmentId), {
+        accounts: { ...state.accounts }
+      })], [state.alice]);
+    });
   });
 
   

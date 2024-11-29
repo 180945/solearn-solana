@@ -2,20 +2,23 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use crate::{MinerInfo, MinersOfModel, Models, SolLearnInfo, VaultAccount};
 
+pub const ANCHOR_DISCRIMINATOR: usize = 8;
+
+
 #[derive(Accounts)]
 pub struct UpdateParamsVld<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
     /// CHECK:
     #[account(mut, constraint = sol_learn_account.admin == admin.key())]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct ReadStateVld<'info> {
     #[account(mut)]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
 }
 
 #[derive(Accounts)]
@@ -67,11 +70,14 @@ pub enum AssignmentRole {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct Inference {
     pub bump: u8,
     pub id: u64,
+    #[max_len(5)]
     pub assignments: Vec<u64>,
     pub digests: Hashes,
+    #[max_len(256)]
     pub input: Vec<u8>,
     pub value: u64,
     pub fee_l2: u64,
@@ -98,18 +104,19 @@ pub struct InferVld<'info> {
     #[account(
         init,
         payer = signer,
-        space = 8*7 + 32*4 + 2 + 8 + 128, seeds = [b"inference", inference_id.to_le_bytes().as_ref()],
+        space = ANCHOR_DISCRIMINATOR + Inference::INIT_SPACE, // 8*7 + 32*4 + 2 + 8 + 128,
+        seeds = [b"inference", inference_id.to_le_bytes().as_ref()],
         bump
     )]
     pub infs: Account<'info, Inference>,
     #[account(mut)]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     // #[account(mut, seeds = [b"assignment", signer.key().as_ref()], bump = assignment.bump)]
     // pub assignment: Account<'info, Assignment>,
     // #[account(mut)]
     // pub miner_addresses: Account<'info, Pubkeys>,
-    #[account(mut)]
-	pub tasks: Account<'info, Tasks>,
+    #[account(mut, seeds = [b"tasks", sol_learn_account.key().as_ref()], bump)]
+	pub tasks: Box<Account<'info, Tasks>>,
 	#[account(mut)]
 	pub models: Account<'info, Models>,
 	// #[account(mut, seeds = [b"referrer", creator.to_bytes().as_ref()], bump)]
@@ -148,7 +155,9 @@ pub struct UpdateInferVld<'info> {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct VotingInfo {
+    pub bump: u8,
     pub total_commit: u8,
     pub total_reveal: u8,
 }
@@ -173,6 +182,7 @@ pub enum DAOTokenReceiverRole {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct DAOTokenReceiverInfo {
     pub receiver: Pubkey,
     pub amount: u64,
@@ -180,9 +190,11 @@ pub struct DAOTokenReceiverInfo {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct DAOTokenReceiverInfos {
-    pub values: Vec<DAOTokenReceiverInfo>,
     pub bump: u8,
+    #[max_len(5)]
+    pub values: Vec<DAOTokenReceiverInfo>,
 }
 
 pub enum Vote {
@@ -204,6 +216,7 @@ pub enum Vote {
 // }
 
 #[account]
+#[derive(InitSpace)]
 pub struct Assignment {
     pub bump: u8,
     pub id: u64,
@@ -214,6 +227,7 @@ pub struct Assignment {
     pub worker: Pubkey,
     pub role: u8,
     pub vote: u8,
+    #[max_len(256)]
     pub output: Vec<u8>,
 }
 
@@ -227,7 +241,9 @@ pub struct MinerEpochState {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct Hashes {
+    #[max_len(5)]
     pub values: Vec<[u8; 32]>,
 }
 
@@ -245,7 +261,7 @@ pub struct DAOTokenPercentage {
 pub struct UpdateEpochVld<'info> {
     pub system_program: Program<'info, System>,
     #[account(mut)]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(mut, seeds = [b"reward_in_epoch", epoch_id.to_le_bytes().as_ref()], bump = miner_reward.bump)]
     pub miner_reward: Account<'info, MinerEpochState>,
     pub signer: Signer<'info>,
@@ -255,7 +271,7 @@ pub struct UpdateEpochVld<'info> {
 pub struct SlashMinerByAdminVld<'info> {
     pub system_program: Program<'info, System>,
     // #[account(mut)]
-    // pub sol_learn_account: Account<'info, SolLearnInfo>,
+    // pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     // #[account(mut)]
     // pub miner_addresses: Account<'info, Pubkeys>,
     #[account(mut)]
@@ -266,7 +282,7 @@ pub struct SlashMinerByAdminVld<'info> {
     pub miners_of_model: Account<'info, MinersOfModel>,
     /// CHECK:
     #[account(mut, constraint = sol_learn_account.admin == signer.key())]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     pub signer: Signer<'info>,
 }
 
@@ -275,7 +291,7 @@ pub struct SlashMinerByAdminVld<'info> {
 pub struct CreateAssignmentVld<'info> {
 	#[account(init,
         payer = signer,
-        space = 8*3 + 32*3 + 1*3 + 8 + 8,
+        space = ANCHOR_DISCRIMINATOR + Assignment::INIT_SPACE, // 8*3 + 32*3 + 1*3 + 8 + 8,
         seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()],
         bump
     )]
@@ -312,7 +328,7 @@ pub struct PayMinerVld<'info> {
 pub struct SlashMinerVld<'info> {
 	// pub system_program: Program<'info, System>,
 	#[account(mut)]
-	pub sol_learn_account: Account<'info, SolLearnInfo>,
+	pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
 	// #[account(mut)]
 	// pub miner_addresses: Account<'info, Pubkeys>,
 	#[account(mut)]
@@ -341,10 +357,10 @@ pub struct SlashMinerVld<'info> {
 #[instruction(assignment_id: u64, inference_id: u64)]
 pub struct SeizeMinerRoleVld<'info> {
     #[account(mut)]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
-    #[account(mut)]
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
+    #[account(mut, seeds = [b"inference", inference_id.to_le_bytes().as_ref()], bump = infs.bump)]
     pub infs: Account<'info, Inference>,
-    #[account(mut)]
+    #[account(mut, seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()], bump = assignment.bump)]
     pub assignment: Account<'info, Assignment>,
     #[account(mut)]
     pub miner_account: Account<'info, MinerInfo>,
@@ -358,10 +374,10 @@ pub struct SeizeMinerRoleVld<'info> {
 #[instruction(assignment_id: u64, inference_id: u64)]
 pub struct UpdateAssignmentVld<'info> {
     #[account(mut)]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
-    #[account(mut)]
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
+    #[account(mut, seeds = [b"inference", inference_id.to_le_bytes().as_ref()], bump = infs.bump)]
     pub infs: Account<'info, Inference>,
-    #[account(mut)]
+    #[account(mut, seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()], bump = assignment.bump)]
     pub assignment: Account<'info, Assignment>,
     // #[account(mut)]
     // pub miner_addresses: Account<'info, Pubkeys>,
@@ -369,12 +385,14 @@ pub struct UpdateAssignmentVld<'info> {
     // pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
     pub miner_account: Account<'info, MinerInfo>,
-    #[account(init_if_needed, payer = signer, space = 24, seeds = [b"voting_info", inference_id.to_le_bytes().as_ref()], bump )]
-    pub voting_info: Account<'info, VotingInfo>,
-    #[account(mut)]
-	pub tasks: Account<'info, Tasks>,
-    #[account(init_if_needed, payer = signer, space = 1024, seeds = [b"dao_receivers_infos", sol_learn_account.key().as_ref(), inference_id.to_le_bytes().as_ref()], bump)]
-    pub dao_receiver_infos: Account<'info, DAOTokenReceiverInfos>,
+    #[account(init_if_needed, payer = signer, space = ANCHOR_DISCRIMINATOR + VotingInfo::INIT_SPACE,
+        seeds = [b"voting_info", inference_id.to_le_bytes().as_ref()], bump )]
+    pub voting_info: Box<Account<'info, VotingInfo>>,
+    #[account(mut, seeds = [b"tasks", sol_learn_account.key().as_ref()], bump)]
+	pub tasks: Box<Account<'info, Tasks>>,
+    #[account(init_if_needed, payer = signer, space = ANCHOR_DISCRIMINATOR + DAOTokenReceiverInfos::INIT_SPACE,
+        seeds = [b"dao_receiver_infos", sol_learn_account.key().as_ref(), inference_id.to_le_bytes().as_ref()], bump)]
+    pub dao_receiver_infos: Box<Account<'info, DAOTokenReceiverInfos>>,
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(mut)]
@@ -390,7 +408,7 @@ pub struct UpdateAssignmentVld<'info> {
 #[derive(Accounts)]
 pub struct UpdateMinerAddressesByModelVld<'info> {
     #[account(mut)]
-    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     pub signer: Signer<'info>,
     // #[account(mut)]
     // pub miner_addresses: Account<'info, Pubkeys>,
@@ -399,7 +417,7 @@ pub struct UpdateMinerAddressesByModelVld<'info> {
 // #[derive(Accounts)]
 // pub struct UpdateTaskVld<'info> {
 // 	#[account(mut)]
-// 	pub sol_learn_account: Account<'info, SolLearnInfo>,
+// 	pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
 // 	#[account(mut)]
 // 	pub tasks: Account<'info, Tasks>,
 // 	#[account(mut)]

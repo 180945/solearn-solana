@@ -743,7 +743,7 @@ pub mod solearn {
             return Err(SolLearnError::Unauthorized.into());
         }
 
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         if assignment.worker != ctx.accounts.signer.key() {
             return Err(SolLearnError::Unauthorized.into());
@@ -770,13 +770,13 @@ pub mod solearn {
     }
 
     pub fn submit_solution(
-        ctx: Context<UpdateAssignmentVld>,
+        ctx: Context<SeizeMinerRoleVld>,
         assignment_id: u64,
         inference_id: u64,
         data: Vec<u8>,
     ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         let assignment = &mut ctx.accounts.assignment;
         let inference = &mut ctx.accounts.infs;
@@ -792,13 +792,16 @@ pub mod solearn {
         if ctx.accounts.signer.key() != assignment.worker {
             return Err(SolLearnError::Unauthorized.into());
         }
-        if assignment.role != 1 {
+        if assignment.role != 2 {
+            msg!("role: {}", assignment.role);
             return Err(SolLearnError::Unauthorized.into());
         }
         if !assignment.output.is_empty() {
+            msg!("output: {:?}", assignment.output);
             return Err(SolLearnError::Unauthorized.into());
         }
         if inference.status != 1 {
+            msg!("status: {}", inference.status);
             return Err(SolLearnError::Unauthorized.into());
         }
 
@@ -825,10 +828,11 @@ pub mod solearn {
     pub fn commit(
         ctx: Context<UpdateAssignmentVld>,
         assignment_id: u64,
+        inference_id: u64,
         commitment: [u8; 32],
     ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
         let assignment = &mut ctx.accounts.assignment;
         let inference = &mut ctx.accounts.infs;
         let voting_info = &mut ctx.accounts.voting_info;
@@ -883,11 +887,12 @@ pub mod solearn {
     pub fn reveal(
         ctx: Context<UpdateAssignmentVld>,
         assignment_id: u64,
+        inference_id: u64,
         nonce: u64,
         data: Vec<u8>,
     ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
         let assignment = &mut ctx.accounts.assignment;
         let inference = &mut ctx.accounts.infs;
         let voting_info = &mut ctx.accounts.voting_info;
@@ -950,7 +955,7 @@ pub mod solearn {
         }
 
         if voting_info.total_reveal as usize == inference.assignments.len() - 1 {
-            resolve_inference(ctx, assignment_id)?;
+            resolve_inference(ctx, assignment_id, infer_id)?;
         }
 
         emit!(RevealSubmission {
@@ -963,7 +968,7 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn resolve_inference(ctx: Context<UpdateAssignmentVld>, assignment_id: u64) -> Result<()> {
+    pub fn resolve_inference(ctx: Context<UpdateAssignmentVld>, assignment_id: u64, inference_id: u64) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
         let inference = &mut ctx.accounts.infs;
         let assignment = &mut ctx.accounts.assignment;
@@ -977,10 +982,10 @@ pub mod solearn {
         if assignment_id != assignment.id {
             return Err(SolLearnError::Unauthorized.into());
         }
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         let infer_id = inference.id;
-        if inference.id != infer_id {
+        if inference.id != infer_id || inference.id != inference_id {
             return Err(SolLearnError::Unauthorized.into());
         }
 
@@ -1174,7 +1179,7 @@ pub mod solearn {
         is_fined: bool,
     ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         if _miner == Pubkey::default() {
             return Err(SolLearnError::Unauthorized.into());
@@ -1277,7 +1282,7 @@ pub mod solearn {
 
     pub fn set_fine_percentage(ctx: Context<UpdateParamsVld>, fine_percentage: u16) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         acc.fine_percentage = fine_percentage;
         emit!(FinePercentageUpdated {
@@ -1292,7 +1297,7 @@ pub mod solearn {
         penalty_duration: u64,
     ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         acc.penalty_duration = penalty_duration;
         emit!(PenaltyDurationUpdated {
@@ -1304,7 +1309,7 @@ pub mod solearn {
 
     pub fn set_min_fee_to_use(ctx: Context<UpdateParamsVld>, min_fee_to_use: u64) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         acc.min_fee_to_use = min_fee_to_use;
         emit!(MinFeeToUseUpdated {
@@ -1316,7 +1321,7 @@ pub mod solearn {
 
     pub fn set_l2_owner(ctx: Context<UpdateParamsVld>, l2_owner_address: Pubkey) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         acc.l2_owner = l2_owner_address;
         emit!(L2OwnerUpdated {
@@ -1343,7 +1348,7 @@ pub mod solearn {
         treasury_address: Pubkey,
     ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         acc.treasury = treasury_address;
         emit!(TreasuryAddressUpdated {
@@ -1358,7 +1363,7 @@ pub mod solearn {
         new_ratio: u16,
     ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         acc.fee_ratio_miner_validator = new_ratio;
         emit!(FeeRatioMinerValidatorUpdated {
@@ -1373,7 +1378,7 @@ pub mod solearn {
         new_dao_token_reward: u64,
     ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
-        only_updated_epoch(acc)?;
+        // only_updated_epoch(acc)?;
 
         acc.dao_token_reward = new_dao_token_reward;
         emit!(DaoTokenRewardUpdated {
