@@ -246,12 +246,8 @@ pub struct UpdateEpochVld<'info> {
     pub system_program: Program<'info, System>,
     #[account(mut)]
     pub sol_learn_account: Account<'info, SolLearnInfo>,
-    // #[account(mut)]
-    // pub miner_addresses: Account<'info, Pubkeys>,
     #[account(mut, seeds = [b"reward_in_epoch", epoch_id.to_le_bytes().as_ref()], bump = miner_reward.bump)]
     pub miner_reward: Account<'info, MinerEpochState>,
-    // #[account(mut)]
-    // pub miner: Account<'info, Worker>,
     pub signer: Signer<'info>,
 }
 
@@ -265,7 +261,7 @@ pub struct SlashMinerByAdminVld<'info> {
     #[account(mut)]
     pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
-    pub miner: Account<'info, MinerInfo>,
+    pub miner_account: Account<'info, MinerInfo>,
     #[account(mut)]
     pub miners_of_model: Account<'info, MinersOfModel>,
     /// CHECK:
@@ -320,7 +316,7 @@ pub struct SlashMinerVld<'info> {
 	// #[account(mut)]
 	// pub miner_addresses: Account<'info, Pubkeys>,
 	#[account(mut)]
-	pub miner: Account<'info, MinerInfo>,
+	pub miner_account: Account<'info, MinerInfo>,
 	#[account(mut)]
 	pub tasks: Account<'info, Tasks>,
 	#[account(mut)]
@@ -341,6 +337,21 @@ pub struct SlashMinerVld<'info> {
     pub token_recipient: InterfaceAccount<'info, TokenAccount>,
 }
 
+#[derive(Accounts)]
+#[instruction(assignment_id: u64, inference_id: u64)]
+pub struct SeizeMinerRoleVld<'info> {
+    #[account(mut)]
+    pub sol_learn_account: Account<'info, SolLearnInfo>,
+    #[account(mut)]
+    pub infs: Account<'info, Inference>,
+    #[account(mut)]
+    pub assignment: Account<'info, Assignment>,
+    #[account(mut)]
+    pub miner_account: Account<'info, MinerInfo>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
 
 #[derive(Accounts)]
@@ -357,12 +368,12 @@ pub struct UpdateAssignmentVld<'info> {
     // #[account(mut)]
     // pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
-    pub miner: Account<'info, MinerInfo>,
+    pub miner_account: Account<'info, MinerInfo>,
     #[account(init_if_needed, payer = signer, space = 24, seeds = [b"voting_info", inference_id.to_le_bytes().as_ref()], bump )]
     pub voting_info: Account<'info, VotingInfo>,
     #[account(mut)]
 	pub tasks: Account<'info, Tasks>,
-    #[account(init_if_needed, payer = signer, space = 1024, seeds = [b"dao_receivers_infos", sol_learn_account.key().as_ref()], bump)]
+    #[account(init_if_needed, payer = signer, space = 1024, seeds = [b"dao_receivers_infos", sol_learn_account.key().as_ref(), inference_id.to_le_bytes().as_ref()], bump)]
     pub dao_receiver_infos: Account<'info, DAOTokenReceiverInfos>,
     #[account(mut)]
     pub signer: Signer<'info>,

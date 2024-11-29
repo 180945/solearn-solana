@@ -305,7 +305,7 @@ describe('Solearn Bankrun example', function () {
     return _s.program;
   }
 
-  async function simulateInferAndAssign(_s) {
+  async function simulateInferAndAssign(_s, _infId: number = 1) {
     const workerHub = _s.program;
 
     _s.accounts.signer = _s.alice.publicKey;
@@ -369,7 +369,7 @@ describe('Solearn Bankrun example', function () {
       _s.program.programId,
     )[0];
     _s.accounts.minerStakingWallet = _s.aliceTokenAccountA;
-    let infId = new BN(1);
+    let infId = new BN(_infId);
     
     _s.accounts.infs = PublicKey.findProgramAddressSync(
       [Buffer.from('inference'), infId.toBuffer('le', 8)],
@@ -477,10 +477,12 @@ describe('Solearn Bankrun example', function () {
 
   describe('Test staking', async function () {
     let assignedMiner;
+    let inferenceId = 1;
+    let assignmentId = 1;
     
     it('should call infer and get assigned', async function () {
       await initProgram(state);
-      const res = await simulateInferAndAssign(state);
+      const res = await simulateInferAndAssign(state, inferenceId);
       console.log('infer & assigned', res.map(m => m.publicKey.toBase58()));
       assignedMiner = res[0];
     });
@@ -508,18 +510,53 @@ describe('Solearn Bankrun example', function () {
         [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
         state.program.programId,
       )[0];
-      state.accounts.votingInfo = PublicKey.findProgramAddressSync(
-        [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
+      state.accounts.daoReceiverInfos = PublicKey.findProgramAddressSync(
+        [Buffer.from('dao_receiver_infos'), state.accounts.solLearnAccount.toBuffer()],
         state.program.programId,
-      )[0];     
+      )[0]; 
+      state.accounts.votingInfo = PublicKey.findProgramAddressSync(
+        [Buffer.from('voting_info'), new BN(inferenceId).toBuffer('le', 8)],
+        state.program.programId,
+      )[0];         
       await sendAndConfirmTx(state.provider, [await state.program.instruction.seizeMinerRole(
-        new BN(1),
-        new BN(1),
+        new BN(assignmentId),
+        new BN(inferenceId),
         {
           accounts: { ...state.accounts }
         }
       )], [assignedMiner]);
+
+      // this should fail
+      // expect(await sendAndConfirmTx(state.provider, [await state.program.instruction.seizeMinerRole(
+      //   new BN(1),
+      //   new BN(1),
+      //   {
+      //     accounts: { ...state.accounts }
+      //   }
+      // )], [assignedMiner])).to.throw('inference has been seized');
     });
+
+    it("should submit solution", async () => {
+      state.accounts.signer = assignedMiner.publicKey;
+      state.accounts.miner = assignedMiner.publicKey;
+      state.accounts.minerAccount = PublicKey.findProgramAddressSync(
+        [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
+        state.program.programId,
+      )[0];
+      state.accounts.daoReceiverInfos = PublicKey.findProgramAddressSync(
+        [Buffer.from('dao_receiver_infos'), state.accounts.solLearnAccount.toBuffer(), new BN(inferenceId).toBuffer('le', 8)],
+        state.program.programId,
+      )[0]; 
+      state.accounts.votingInfo = PublicKey.findProgramAddressSync(
+        [Buffer.from('voting_info'), new BN(inferenceId).toBuffer('le', 8)],
+        state.program.programId,
+      )[0];         
+      const solution = Buffer.from("solution for test");
+      await sendAndConfirmTx(state.provider, [await state.program.instruction.submitSolution(new BN(inferenceId), new BN(assignmentId), solution, {
+        accounts: { ...state.accounts }
+      })], [assignedMiner]);
+    });
+      
     
   });
 

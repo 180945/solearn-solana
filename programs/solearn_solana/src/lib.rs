@@ -734,7 +734,7 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn seize_miner_role(ctx: Context<UpdateAssignmentVld>, assignment_id: u64, inference_id: u64) -> Result<()> {
+    pub fn seize_miner_role(ctx: Context<SeizeMinerRoleVld>, assignment_id: u64, inference_id: u64) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
         let inference = &mut ctx.accounts.infs;
         let assignment = &mut ctx.accounts.assignment;
@@ -772,6 +772,7 @@ pub mod solearn {
     pub fn submit_solution(
         ctx: Context<UpdateAssignmentVld>,
         assignment_id: u64,
+        inference_id: u64,
         data: Vec<u8>,
     ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
@@ -785,7 +786,7 @@ pub mod solearn {
         if assignment_id != assignment.id {
             return Err(SolLearnError::Unauthorized.into());
         }
-        if inference.id != infer_id {
+        if inference.id != infer_id || inference.id != inference_id {
             return Err(SolLearnError::Unauthorized.into());
         }
         if ctx.accounts.signer.key() != assignment.worker {
@@ -1180,7 +1181,7 @@ pub mod solearn {
         }
 
         let miner_addresses = &mut ctx.accounts.miners_of_model;
-        let miner = &mut ctx.accounts.miner;
+        let miner = &mut ctx.accounts.miner_account;
         if miner.miner != _miner {
             return Err(SolLearnError::Unauthorized.into());
         }
@@ -1193,7 +1194,7 @@ pub mod solearn {
     pub fn slash_miner(ctx: Context<SlashMinerVld>, assignment_id: u64) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
         let miner_addresses = &mut ctx.accounts.miners_of_model;
-        let miner = &mut ctx.accounts.miner;
+        let miner = &mut ctx.accounts.miner_account;
         let assignment = &mut ctx.accounts.assignment;
 
         let tasks = &mut ctx.accounts.tasks;
