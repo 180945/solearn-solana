@@ -55,6 +55,27 @@ export async function simulateAndGetResponse(providerAgr: any, insts: any, signe
   }
 }
 
+export async function makeBlock(provider: any) {
+  const tx = new Transaction();
+  tx.add(SystemProgram.transfer({
+    fromPubkey: provider.publicKey,
+    toPubkey: provider.publicKey,
+    lamports: 1,
+  }));
+  const currentClock = await provider.context.banksClient.getClock();
+  provider.context.setClock(
+    new Clock(
+      currentClock.slot + 1n,
+      currentClock.epochStartTimestamp,
+      currentClock.epoch,
+      currentClock.leaderScheduleEpoch,
+      currentClock.unixTimestamp + 11n,
+    ),
+  );
+
+  await provider.sendAndConfirm(tx, [provider.wallet.payer]);
+}
+
 // We'll call this function from multiple tests, so let's seperate it out
 export async function stake() {
   // fill in here
@@ -379,6 +400,14 @@ describe('Solearn Bankrun example', function () {
       [Buffer.from('referrer'), _s.alice.publicKey.toBuffer()],
       _s.program.programId,
     )[0];
+    state.accounts.daoReceiverInfos = PublicKey.findProgramAddressSync(
+      [Buffer.from('dao_receiver_infos'), state.accounts.solLearnAccount.toBuffer(), new BN(infId).toBuffer('le', 8)],
+      state.program.programId,
+    )[0]; 
+    state.accounts.votingInfo = PublicKey.findProgramAddressSync(
+      [Buffer.from('voting_info'), new BN(infId).toBuffer('le', 8)],
+      state.program.programId,
+    )[0];
 
     const modelInput = Buffer.from(randomBytes(32));
     
@@ -510,14 +539,7 @@ describe('Solearn Bankrun example', function () {
         [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
         state.program.programId,
       )[0];
-      state.accounts.daoReceiverInfos = PublicKey.findProgramAddressSync(
-        [Buffer.from('dao_receiver_infos'), state.accounts.solLearnAccount.toBuffer()],
-        state.program.programId,
-      )[0]; 
-      state.accounts.votingInfo = PublicKey.findProgramAddressSync(
-        [Buffer.from('voting_info'), new BN(inferenceId).toBuffer('le', 8)],
-        state.program.programId,
-      )[0];         
+
       await sendAndConfirmTx(state.provider, [await state.program.instruction.seizeMinerRole(
         new BN(assignmentId),
         new BN(inferenceId),
@@ -575,9 +597,23 @@ describe('Solearn Bankrun example', function () {
       )[0];         
       state.accounts.tokenRecipient = state.aliceTokenAccountA;
       console.log('state.accounts.solLearnAccount', state.accounts.solLearnAccount.toBase58(), state.accounts.tokenRecipient);
+      for (let i = 0; i < 21; i++) {
+        await makeBlock(state.provider);
+        // sleep for 200ms
+        await new Promise(r => setTimeout(r, 200));
+      }
+      
       await sendAndConfirmTx(state.provider, [await state.program.instruction.resolveInference(new BN(inferenceId), new BN(assignmentId), {
         accounts: { ...state.accounts }
       })], [state.alice]);
+      let taskCount = new BN(
+        await simulateAndGetResponse(state.provider,
+          [await state.program.instruction.getTaskCount({ accounts: { ...state.accounts } })],
+          [state.provider.wallet.payer]
+        ),
+        undefined, 'le',
+      );
+      expect(taskCount.toNumber()).to.eq(1);
     });
   });
 

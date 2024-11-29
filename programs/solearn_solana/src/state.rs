@@ -82,7 +82,7 @@ pub struct AddModel<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref(), model.key().as_ref()], 
         bump
     )]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     pub system_program: Program<'info, System>,
 }
 
@@ -109,7 +109,7 @@ pub struct RemoveModel<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref(), model.key().as_ref()], 
         bump = miners_of_model.bump
     )]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     pub system_program: Program<'info, System>,
 }
 
@@ -195,7 +195,7 @@ pub struct MinerUnStaking<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
         bump = miners_of_model.bump,
     )]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
 }
@@ -278,7 +278,7 @@ pub struct JoinForMinting<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref(), miner_account.model.key().as_ref()], 
         bump = miners_of_model.bump
     )]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     pub models: Account<'info, Models>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,

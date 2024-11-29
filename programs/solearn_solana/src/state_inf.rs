@@ -25,7 +25,7 @@ pub struct ReadStateVld<'info> {
 #[instruction(assignment_id: u64)]
 pub struct ReadAssignmentVld<'info> {
     #[account(mut, seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()], bump = assignment.bump)]
-    pub assignment: Account<'info, Assignment>,
+    pub assignment: Box<Account<'info, Assignment>>,
 }
 
 #[derive(Accounts)]
@@ -108,13 +108,19 @@ pub struct InferVld<'info> {
         seeds = [b"inference", inference_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub infs: Account<'info, Inference>,
+    pub infs: Box<Account<'info, Inference>>,
     #[account(mut)]
     pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     // #[account(mut, seeds = [b"assignment", signer.key().as_ref()], bump = assignment.bump)]
-    // pub assignment: Account<'info, Assignment>,
+    // pub assignment: Box<Account<'info, Assignment>>,
     // #[account(mut)]
     // pub miner_addresses: Account<'info, Pubkeys>,
+    #[account(init, payer = signer, space = ANCHOR_DISCRIMINATOR + VotingInfo::INIT_SPACE,
+        seeds = [b"voting_info", inference_id.to_le_bytes().as_ref()], bump )]
+    pub voting_info: Box<Account<'info, VotingInfo>>,
+    #[account(init, payer = signer, space = ANCHOR_DISCRIMINATOR + DAOTokenReceiverInfos::INIT_SPACE,
+        seeds = [b"dao_receiver_infos", sol_learn_account.key().as_ref(), inference_id.to_le_bytes().as_ref()], bump)]
+    pub dao_receiver_infos: Box<Account<'info, DAOTokenReceiverInfos>>,
     #[account(mut, seeds = [b"tasks", sol_learn_account.key().as_ref()], bump)]
 	pub tasks: Box<Account<'info, Tasks>>,
 	#[account(mut)]
@@ -122,7 +128,7 @@ pub struct InferVld<'info> {
 	// #[account(mut, seeds = [b"referrer", creator.to_bytes().as_ref()], bump)]
 	// pub referrer: Account<'info, Referrer>,
     #[account(mut)]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(
@@ -142,7 +148,7 @@ pub struct InferVld<'info> {
 #[instruction(inference_id: u64)]
 pub struct UpdateInferVld<'info> {
     #[account(mut)]
-    pub infs: Account<'info, Inference>,
+    pub infs: Box<Account<'info, Inference>>,
     pub signer: Signer<'info>,
     #[account(mut)]
     pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
@@ -279,7 +285,7 @@ pub struct SlashMinerByAdminVld<'info> {
     #[account(mut)]
     pub miner_account: Account<'info, MinerInfo>,
     #[account(mut)]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
     /// CHECK:
     #[account(mut, constraint = sol_learn_account.admin == signer.key())]
     pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
@@ -295,7 +301,7 @@ pub struct CreateAssignmentVld<'info> {
         seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()],
         bump
     )]
-	pub assignment: Account<'info, Assignment>,
+	pub assignment: Box<Account<'info, Assignment>>,
 	#[account(mut)]
 	pub tasks: Account<'info, Tasks>,
     #[account(mut)]
@@ -312,7 +318,7 @@ pub struct PayMinerVld<'info> {
         seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()],
         bump = assignment.bump
     )]
-    pub assignment: Account<'info, Assignment>,
+    pub assignment: Box<Account<'info, Assignment>>,
 	#[account(mut)]
     pub vault_wallet_owner_pda: Account<'info, VaultAccount>,
     #[account(mut, constraint = vault_staking_wallet.owner == vault_wallet_owner_pda.key())]
@@ -336,9 +342,9 @@ pub struct SlashMinerVld<'info> {
 	#[account(mut)]
 	pub tasks: Account<'info, Tasks>,
 	#[account(mut)]
-    pub assignment: Account<'info, Assignment>,
+    pub assignment: Box<Account<'info, Assignment>>,
     #[account(mut)]
-    pub miners_of_model: Account<'info, MinersOfModel>,
+    pub miners_of_model: Box<Account<'info, MinersOfModel>>,
 	// #[account(mut)]
 	// pub signer: Signer<'info>,
 	#[account(mut)]
@@ -359,9 +365,9 @@ pub struct SeizeMinerRoleVld<'info> {
     #[account(mut)]
     pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(mut, seeds = [b"inference", inference_id.to_le_bytes().as_ref()], bump = infs.bump)]
-    pub infs: Account<'info, Inference>,
+    pub infs: Box<Account<'info, Inference>>,
     #[account(mut, seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()], bump = assignment.bump)]
-    pub assignment: Account<'info, Assignment>,
+    pub assignment: Box<Account<'info, Assignment>>,
     #[account(mut)]
     pub miner_account: Account<'info, MinerInfo>,
     #[account(mut)]
@@ -376,23 +382,23 @@ pub struct UpdateAssignmentVld<'info> {
     #[account(mut)]
     pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     #[account(mut, seeds = [b"inference", inference_id.to_le_bytes().as_ref()], bump = infs.bump)]
-    pub infs: Account<'info, Inference>,
+    pub infs: Box<Account<'info, Inference>>,
     #[account(mut, seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()], bump = assignment.bump)]
-    pub assignment: Account<'info, Assignment>,
+    pub assignment: Box<Account<'info, Assignment>>,
     // #[account(mut)]
     // pub miner_addresses: Account<'info, Pubkeys>,
     // #[account(mut)]
     // pub miner_reward: Account<'info, MinerEpochState>,
     #[account(mut)]
     pub miner_account: Account<'info, MinerInfo>,
-    #[account(init_if_needed, payer = signer, space = ANCHOR_DISCRIMINATOR + VotingInfo::INIT_SPACE,
+    #[account(mut,
         seeds = [b"voting_info", inference_id.to_le_bytes().as_ref()], bump )]
     pub voting_info: Box<Account<'info, VotingInfo>>,
-    #[account(mut, seeds = [b"tasks", sol_learn_account.key().as_ref()], bump)]
-	pub tasks: Box<Account<'info, Tasks>>,
-    #[account(init_if_needed, payer = signer, space = ANCHOR_DISCRIMINATOR + DAOTokenReceiverInfos::INIT_SPACE,
+    #[account(mut,
         seeds = [b"dao_receiver_infos", sol_learn_account.key().as_ref(), inference_id.to_le_bytes().as_ref()], bump)]
     pub dao_receiver_infos: Box<Account<'info, DAOTokenReceiverInfos>>,
+    #[account(mut, seeds = [b"tasks", sol_learn_account.key().as_ref()], bump)]
+    pub tasks: Box<Account<'info, Tasks>>,
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(mut)]

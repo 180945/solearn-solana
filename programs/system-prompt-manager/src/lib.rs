@@ -13,7 +13,7 @@ use anchor_spl::metadata::{
 use solearn_solana::cpi::accounts::InferVld;
 use anchor_spl::token::{self, Transfer};
 
-declare_id!("nuvdhmYq5Z2Eg4nBi29Tu2VcbpE9nuiCQ68rkyAB3A1");
+declare_id!("4eGq5G49MihHyXFjtF9nrZcMA8vRxvmsz2PUDwWxfTFd");
 
 #[program]
 pub mod nft_program {
@@ -282,6 +282,8 @@ pub mod nft_program {
             token_program: ctx.accounts.token_program.to_account_info(),
             vault_staking_wallet: ctx.accounts.vault_staking_wallet.to_account_info(),
             miners_of_model: ctx.accounts.miners_of_model.to_account_info(),
+            dao_receiver_infos: ctx.accounts.miners_of_model.to_account_info(),
+            voting_info: ctx.accounts.miners_of_model.to_account_info(),
         };
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         solearn_solana::cpi::infer(cpi_ctx, inference_id, creator, infer_data, infer_value, ctx.accounts.models.key())?;

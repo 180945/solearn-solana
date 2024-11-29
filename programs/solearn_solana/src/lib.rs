@@ -1023,7 +1023,9 @@ pub mod solearn {
 
             }
         } else if inference.status == 2 {
+            msg!("commit_timeout: {} vs {}", inference.commit_timeout, Clock::get()?.slot);
             if Clock::get()?.slot > inference.commit_timeout {
+                msg!("total_commit: {}", voting_info.total_commit);
                 if voting_info.total_commit + 1 >= inference.assignments.len() as u8 {
                     inference.status = 3;
                 } else {
@@ -1059,6 +1061,7 @@ pub mod solearn {
                         tasks.push_task(Task::new(FnType::SlashMiner, data));
                     }
                 }
+                msg!("final inference status {}", inference.status);
             }
         } else if inference.status == 3 {
             if Clock::get()?.slot > inference.reveal_timeout
