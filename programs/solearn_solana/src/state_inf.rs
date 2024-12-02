@@ -412,6 +412,35 @@ pub struct UpdateAssignmentVld<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(assignment_id: u64, inference_id: u64)]
+pub struct CommitVld<'info> {
+    #[account(mut)]
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
+    #[account(mut, seeds = [b"inference", inference_id.to_le_bytes().as_ref()], bump = infs.bump)]
+    pub infs: Box<Account<'info, Inference>>,
+    #[account(mut, seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()], bump = assignment.bump)]
+    pub assignment: Box<Account<'info, Assignment>>,
+    // #[account(mut)]
+    // pub miner_addresses: Account<'info, Pubkeys>,
+    // #[account(mut)]
+    // pub miner_reward: Account<'info, MinerEpochState>,
+    #[account(mut)]
+    pub miner_account: Account<'info, MinerInfo>,
+    #[account(mut,
+        seeds = [b"voting_info", inference_id.to_le_bytes().as_ref()], bump )]
+    pub voting_info: Box<Account<'info, VotingInfo>>,
+    #[account(mut,
+        seeds = [b"dao_receiver_infos", sol_learn_account.key().as_ref(), inference_id.to_le_bytes().as_ref()], bump)]
+    pub dao_receiver_infos: Box<Account<'info, DAOTokenReceiverInfos>>,
+    #[account(mut, seeds = [b"tasks", sol_learn_account.key().as_ref()], bump)]
+    pub tasks: Box<Account<'info, Tasks>>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct UpdateMinerAddressesByModelVld<'info> {
     #[account(mut)]
     pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
@@ -522,7 +551,8 @@ impl Task {
             FnType::PayMiner => 1,
             FnType::SlashMiner => 2,
         };
-        task._b[1..].copy_from_slice(&data);
+        let len = data.len();
+        task._b[1..1 + len].copy_from_slice(&data);
         task
     }
 }
@@ -539,11 +569,11 @@ impl Tasks {
         self.values.extend(task._b.to_vec());
     }
 
-    pub fn pop_task(&mut self) -> Option<Task> {
+    pub fn receive_task(&mut self) -> Option<Task> {
         if self.values.len() < 50 {
             return None;
         }
-        let task: Vec<u8> = self.values.drain(self.values.len() - 50..).collect();
+        let task: Vec<u8> = self.values.drain(0..50).collect();
         
         Some(Task {
             _b: task.try_into().unwrap(),

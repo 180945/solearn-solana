@@ -624,6 +624,7 @@ pub mod solearn {
             msg!("push task: {:?}", data);
 
             selected_miners.push(miner);
+            inference.assignments.push(assignment_id);
             // assignments_by_miner[miner].insert(assignment_id);
             // assignments_by_inference[inference_id].insert(assignment_id);
         }
@@ -655,7 +656,7 @@ pub mod solearn {
     pub fn create_assignment(ctx: Context<CreateAssignmentVld>, assignment_id: u64) -> Result<()> {
         let tasks = &mut ctx.accounts.tasks;
         let task;
-        match tasks.pop_task() {
+        match tasks.receive_task() {
             Some(t) => task = t,
             None => return Err(SolLearnError::NoValidTask.into()),
         }
@@ -812,7 +813,7 @@ pub mod solearn {
         assignment.output = data.clone();
 
         inference.status = 2;
-        inference.assignments.push(assignment.id);
+        // inference.assignments.push(assignment.id);
         inference.digests.values.push(digest.to_bytes());
 
         
@@ -831,7 +832,7 @@ pub mod solearn {
     }
 
     pub fn commit(
-        ctx: Context<UpdateAssignmentVld>,
+        ctx: Context<CommitVld>,
         assignment_id: u64,
         inference_id: u64,
         commitment: [u8; 32],
@@ -845,21 +846,30 @@ pub mod solearn {
         let infer_id = assignment.inference_id;
 
         if assignment_id != assignment.id {
+            msg!("assignment_id: {} {}", assignment_id, assignment.id);
+            
             return Err(SolLearnError::Unauthorized.into());
         }
         if inference.id != infer_id {
+            msg!("inference_id: {} {}", inference_id, infer_id);
             return Err(SolLearnError::Unauthorized.into());
         }
         if ctx.accounts.signer.key() != assignment.worker {
+            msg!("worker: {} {}", ctx.accounts.signer.key(), assignment.worker);
             return Err(SolLearnError::Unauthorized.into());
         }
         if assignment.role != 1 {
+            msg!("role: {}", assignment.role);
+
             return Err(SolLearnError::Unauthorized.into());
         }
         if assignment.commitment != [0; 32] {
+            msg!("commitment: {:?}", assignment.commitment);
             return Err(SolLearnError::Unauthorized.into());
         }
         if inference.status != 2 {
+            msg!("status: {}", inference.status);
+
             return Err(SolLearnError::Unauthorized.into());
         }
 
@@ -869,8 +879,6 @@ pub mod solearn {
         }
 
         assignment.commitment = commitment;
-        let l = inference.assignments.len();
-        inference.assignments.insert(l, assignment.id);
         voting_info.total_commit += 1;
 
         if voting_info.total_commit as usize == inference.assignments.len() - 1 {
@@ -943,22 +951,7 @@ pub mod solearn {
         assignment.digest = digest.to_bytes();
         voting_info.total_reveal += 1;
 
-        if inference.digests.values.len() == 0 {
-            let zero: [u8; 32] = [0; 32];
-            inference.digests.values = vec![zero; inference.assignments.len()];
-        }
-
-        let index = inference
-            .assignments
-            .iter()
-            .position(|&r| r == assignment_id)
-            .unwrap();
-        if inference.digests.values[index] == [0; 32] {
-            inference.digests.values[index] = digest.to_bytes();
-        } else {
-            return Err(SolLearnError::InvalidReveal.into());
-        }
-
+        inference.digests.values.push(digest.to_bytes());
         if voting_info.total_reveal as usize == inference.assignments.len() - 1 {
             resolve_inference(ctx, assignment_id, infer_id)?;
         }
@@ -994,6 +987,7 @@ pub mod solearn {
             return Err(SolLearnError::Unauthorized.into());
         }
 
+        msg!("begin status: {}", inference.status);
         if inference.status == 1 {
             if Clock::get()?.slot > inference.submit_timeout
                 && inference.processed_miner != Pubkey::default()
@@ -1129,7 +1123,7 @@ pub mod solearn {
         let assignment = &mut ctx.accounts.assignment;
 
         let task;
-        match tasks.pop_task() {
+        match tasks.receive_task() {
             Some(t) => task = t,
             None => return Err(SolLearnError::NoValidTask.into()),
         }
@@ -1216,7 +1210,7 @@ pub mod solearn {
 
         let tasks = &mut ctx.accounts.tasks;
         let task;
-        match tasks.pop_task() {
+        match tasks.receive_task() {
             Some(t) => task = t,
             None => return Err(SolLearnError::NoValidTask.into()),
         }
