@@ -11,7 +11,7 @@ use state::*;
 use state_inf::*;
 use utils::*;
 
-declare_id!("8fXqHtGHRwr7Mdif7HJhsV66qwSWLnozjabo2uEHPFZ1");
+declare_id!("8avCUgenAc7caGLPACHgjrcsyvqUPHf75wcGLpPCrDdk");
 
 #[program]
 pub mod solearn {
