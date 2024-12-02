@@ -529,7 +529,6 @@ pub mod solearn {
         // referrer.bump = ctx.bumps.referrer;
 
         msg!("miner len {}", miners_of_model.data.len());
-        let miners_len = miners_of_model.data.len() / 32;
         // if model.tier == 0 {
         //     return Err(SolLearnError::Unauthorized.into());
         // }
@@ -600,11 +599,11 @@ pub mod solearn {
             let rand_uint = random_number(
                 &&Clock::get()?,
                 i.into(),
-                miners_len as u64,
+                (miners_of_model.data.len() / 32) as u64,
             );
 
-            let miner_ind = (rand_uint as usize) % miners_len;
-            msg!("all miners_of_model {:?} and #{} was chosen", miners_of_model.data.clone(), miner_ind);
+            let miner_ind = (rand_uint as usize) % (miners_of_model.data.len() / 32);
+            msg!("random number {} and miner #{} was chosen", rand_uint, miner_ind);
 
             let miner_bytes = miners_of_model.data.drain(miner_ind*32..(miner_ind+1)*32).collect::<Vec<u8>>();
             let miner = Pubkey::new_from_array(miner_bytes.try_into().unwrap());
@@ -806,12 +805,18 @@ pub mod solearn {
         }
 
         let mut concatenated: Vec<u8> = infer_id.to_le_bytes().to_vec();
-        concatenated.extend(data);
+        concatenated.extend(data.clone());
         let digest = hash(&mut concatenated);
         assignment.digest = digest.to_bytes();
         assignment.commitment = digest.to_bytes();
+        assignment.output = data.clone();
+
         inference.status = 2;
         inference.assignments.push(assignment.id);
+        inference.digests.values.push(digest.to_bytes());
+
+        
+
 
         emit!(SolutionSubmission {
             assignment_id,
@@ -997,7 +1002,7 @@ pub mod solearn {
 
                 let value = inference.value + inference.fee_l2 + inference.fee_treasury;
                 let cpi_accounts = Transfer {
-                    from: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+                    from: ctx.accounts.vault_staking_wallet.to_account_info(),
                     to: ctx.accounts.token_recipient.to_account_info(),
                     authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
                 };
@@ -1032,7 +1037,7 @@ pub mod solearn {
                     inference.status = 4;
                     let value = inference.value + inference.fee_l2 + inference.fee_treasury;
                     let cpi_accounts = Transfer {
-                        from: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+                        from: ctx.accounts.vault_staking_wallet.to_account_info(),
                         to: ctx.accounts.token_recipient.to_account_info(),
                         authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
                     };
@@ -1063,22 +1068,26 @@ pub mod solearn {
                 }
                 msg!("final inference status {}", inference.status);
             }
-        } else if inference.status == 3 {
+        }
+        if inference.status == 3 {
             if Clock::get()?.slot > inference.reveal_timeout
                 || voting_info.total_reveal == voting_info.total_commit
             {
                 let tasks = &mut ctx.accounts.tasks;
                 if !filter_commitment(acc, inference, assignment, dao_receivers, tasks)? {
+                    msg!("afdasfasfsa 1");
                     //  handle_not_enough_vote(ctx.accounts.infs.id);
                     let value = inference.value + inference.fee_l2 + inference.fee_treasury;
                     let cpi_accounts = Transfer {
-                        from: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+                        from: ctx.accounts.vault_staking_wallet.to_account_info(),
                         to: ctx.accounts.token_recipient.to_account_info(),
                         authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
                     };
                     let cpi_program = ctx.accounts.token_program.to_account_info();
                     let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+                    msg!("afdasfasfsa 2");
                     token::transfer(cpi_ctx, value)?;
+                    msg!("afdasfasfsa 3");
 
                     // let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
                     // let to = ctx.accounts.recipient.to_account_info();
@@ -1157,7 +1166,7 @@ pub mod solearn {
             v
         };
         let cpi_accounts = Transfer {
-            from: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
+            from: ctx.accounts.vault_staking_wallet.to_account_info(),
             to: ctx.accounts.token_recipient.to_account_info(),
             authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
         };
