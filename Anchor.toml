@@ -1,18 +1,38 @@
 [toolchain]
 
 [features]
-resolution = true
 skip-lint = false
 
 [programs.localnet]
-solearn_solana = "6pBgcQTT6qX1cZgpmeQhAgcFa6pQi76ULu6bdTrqeTZJ"
+solearn_solana = "8avCUgenAc7caGLPACHgjrcsyvqUPHf75wcGLpPCrDdk"
+prompt_system_manager = "J42gZKwZ1pwW2mokBUg6BxznYAYvDeC47VPtsedwWv5t"
+
+[programs.devnet]
+solearn_solana = "8avCUgenAc7caGLPACHgjrcsyvqUPHf75wcGLpPCrDdk"
+prompt_system_manager = "6KQsVGh71DjL1X1C8XywvxepEKTxfRyQT6tCKENptQf9"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test_solearn = "yarn ts-mocha -p ./tsconfig.json -t 1000000 tests/solearn_solana.ts"
+test_init_account = "yarn ts-mocha -p ./tsconfig.json -t 1000000 tests/solearn_init_account.ts"
+
+[test]
+startup_wait = 5000
+shutdown_wait = 2000
+upgradeable = false
+
+[test.validator]
+bind_address = "0.0.0.0"
+url = "https://api.mainnet-beta.solana.com"
+ledger = ".anchor/test-ledger"
+rpc_port = 8899
+
+[[test.validator.clone]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

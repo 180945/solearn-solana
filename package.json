@@ -1,6 +1,7 @@
 {
   "license": "ISC",
   "scripts": {
+    "postinstall": "zx prepare.mjs",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },

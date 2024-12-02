@@ -16,7 +16,7 @@ use anchor_spl::token::{self, Transfer};
 declare_id!("4eGq5G49MihHyXFjtF9nrZcMA8vRxvmsz2PUDwWxfTFd");
 
 #[program]
-pub mod nft_program {
+pub mod prompt_system_manager {
     use super::*;
 
     pub fn create_single_nft(
@@ -112,6 +112,9 @@ pub mod nft_program {
         msg!("Creating seeds");
         let id_bytes = id_collection.to_le_bytes();
         let id_nft_bytes = id_nft.to_le_bytes();
+
+        msg!("fucker: {:?}, {:?}", id_bytes, id_nft_bytes);
+
         let seeds = &[
             "mint".as_bytes(),
             id_bytes.as_ref(),
@@ -201,7 +204,8 @@ pub mod nft_program {
         msg!("Instruction: Add Prompt");
 
         // Initialize the prompt account with the given prompt data
-        ctx.accounts.promt_account.data = prompt.clone();
+        ctx.accounts.prompt_account.data = prompt.clone();
+        ctx.accounts.prompt_account.bump = ctx.accounts.prompt_account.bump;
 
         emit!(PromptUpdated {
             id_collection,
@@ -216,7 +220,7 @@ pub mod nft_program {
         msg!("Instruction: Update Prompt");
 
         // Update the prompt account with the new prompt data
-        ctx.accounts.promt_account.data = prompt.clone();
+        ctx.accounts.prompt_account.data = prompt.clone();
 
         emit!(PromptUpdated {
             id_collection,
@@ -231,7 +235,7 @@ pub mod nft_program {
         msg!("Instruction: Update Fee");
 
         // Update the prompt account with the new fee
-        ctx.accounts.promt_account.fee = fee;
+        ctx.accounts.prompt_account.fee = fee;
 
         emit!(FeeUpdated {
             id_collection,
