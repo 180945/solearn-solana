@@ -127,6 +127,11 @@ pub mod prompt_system_manager {
             &[ctx.bumps.mint],
         ];
 
+        // validate here 
+        if ctx.accounts.authority.key() != ctx.accounts.collection.owner || ctx.accounts.collection_mint.key() !=  ctx.accounts.collection.mint {
+            return Err(SystemPromptManagerError::InvalidCollection.into());
+        }
+
         mint_to(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -144,7 +149,7 @@ pub mod prompt_system_manager {
             CpiContext::new_with_signer(
                 ctx.accounts.metadata_program.to_account_info(),
                 CreateMetadataAccountsV3 {
-                    payer: ctx.accounts.payer.to_account_info(),
+                    payer: ctx.accounts.authority.to_account_info(),
                     mint: ctx.accounts.mint.to_account_info(),
                     metadata: ctx.accounts.nft_metadata.to_account_info(),
                     mint_authority: ctx.accounts.authority.to_account_info(),
@@ -160,7 +165,7 @@ pub mod prompt_system_manager {
                 uri,
                 seller_fee_basis_points: 0,
                 creators: Some(vec![Creator {
-                    address: ctx.accounts.payer.key(),
+                    address: ctx.accounts.authority.key(),
                     verified: true,
                     share: 100,
                 }]),
@@ -180,7 +185,7 @@ pub mod prompt_system_manager {
                 ctx.accounts.metadata_program.to_account_info(),
                 CreateMasterEditionV3 {
                     edition: ctx.accounts.master_edition_account.to_account_info(),
-                    payer: ctx.accounts.payer.to_account_info(),
+                    payer: ctx.accounts.authority.to_account_info(),
                     mint: ctx.accounts.mint.to_account_info(),
                     metadata: ctx.accounts.nft_metadata.to_account_info(),
                     mint_authority: ctx.accounts.authority.to_account_info(),
@@ -194,10 +199,10 @@ pub mod prompt_system_manager {
             Some(1),
         )?;
 
-        emit!(NftCreated {
-            collection_id: id_collection,
-            nft_id: id_nft,
-        });
+        // emit!(NftCreated {
+        //     collection_id: id_collection,
+        //     nft_id: id_nft,
+        // });
 
         Ok(())
     }

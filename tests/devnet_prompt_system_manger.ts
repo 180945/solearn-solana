@@ -39,6 +39,7 @@ describe('Prompt System Manager Bankrun test', () => {
     anchor.setProvider(anchor.AnchorProvider.env());
     // program = anchor.workspace.Solearn as Program<Solearn>;
     program = new anchor.Program<PromptSystemManager>(IDL, anchor.AnchorProvider.env());
+    console.log(program);
     const programProvider = program.provider as anchor.AnchorProvider;
     // const minimumLamports = await getMinimumBalanceForRentExemptMint(connection);
     const adminImportded = programProvider.wallet;
@@ -63,21 +64,67 @@ describe('Prompt System Manager Bankrun test', () => {
       accounts.metadataProgram,
     )[0];
 
-    const tx = await program.methods
-        .createSingleNft(
-            collection_id,
-            "test",
-            "T",
-            "test",
-        )
-        .accounts({
-            ...accounts
-        })
-        .signers([admin])
-        .rpc();
+    // const tx = await program.methods
+    //     .createSingleNft(
+    //         collection_id,
+    //         "test",
+    //         "T",
+    //         "test",
+    //     )
+    //     .accounts({
+    //         ...accounts
+    //     })
+    //     .signers([admin])
+    //     .rpc();
+
+    // console.log({tx});
+
+
+    let nft_id = new BN(1);
+    accounts.collection = accounts.tokenAccount;
+    accounts.collectionMint = accounts.mint;
+    accounts.mint = PublicKey.findProgramAddressSync(
+      [Buffer.from('mint'), collection_id.toArrayLike(Buffer, 'le', 8), nft_id.toArrayLike(Buffer, 'le', 8)],
+      program.programId,
+    )[0];
+
+    accounts.tokenAccount = getAssociatedTokenAddressSync(accounts.mint, accounts.authority, false, TOKEN_PROGRAM);
+    accounts.masterEditionAccount = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), accounts.metadataProgram.toBuffer(), accounts.mint.toBuffer(), Buffer.from('edition')],
+      accounts.metadataProgram,
+    )[0];
+    accounts.nftMetadata = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), accounts.metadataProgram.toBuffer(), accounts.mint.toBuffer()],
+      accounts.metadataProgram,
+    )[0];
+
+    // await sendAndConfirmTx(provider, [await program.instruction.mintToCollection(
+    //     collection_id,
+    //     nft_id,
+    //     "test",
+    //     "T",
+    //     "test",
+    //     {
+    //       accounts: {...accounts}
+    //     }
+    //   )], [alice]);
+
+    const tx = await program.methods.mintToCollection
+    (
+        collection_id,
+        nft_id,
+        "test",
+        "T",
+        "test",
+    )
+    .accounts({
+        ...accounts
+    })
+    .signers([admin])
+    .rpc();
 
     console.log({tx});
-
+    
   }
 
   it('Create an NFT!', async () => {
