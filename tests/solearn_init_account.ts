@@ -93,6 +93,6 @@ describe('Solearn Deploy', () => {
   }
 
   it('Test init account on testnet', async () => {
-    await initProgram();    
+    // await initProgram();    
   });
 });

@@ -13,7 +13,20 @@ use anchor_spl::metadata::{
 use solearn_solana::cpi::accounts::InferVld;
 use anchor_spl::token::{self, Transfer};
 
-declare_id!("4eGq5G49MihHyXFjtF9nrZcMA8vRxvmsz2PUDwWxfTFd");
+declare_id!("8CgzLBj4wq4pwKMv52BGnhaJLE22LEsv7obNTJtASNps");
+
+#[event]
+pub struct NewCollection {
+    pub collection_id: u64,
+}
+
+
+#[event]
+pub struct NftCreated {
+    pub collection_id: u64,
+    pub nft_id: u64,
+}
+
 
 #[program]
 pub mod prompt_system_manager {
@@ -26,11 +39,8 @@ pub mod prompt_system_manager {
         symbol: String,
         uri: String,
     ) -> Result<()> {
-        msg!("Creating seeds");
         let id_bytes = id.to_le_bytes();
         let seeds = &["mint".as_bytes(),id_bytes.as_ref(),&[ctx.bumps.mint],];
-
-        msg!("Run mint_to");
 
         mint_to(
             CpiContext::new_with_signer(
@@ -44,8 +54,6 @@ pub mod prompt_system_manager {
             ),
             1, // 1 token
         )?;
-
-        msg!("Run create metadata accounts v3");
 
         create_metadata_accounts_v3(
             CpiContext::new_with_signer(
@@ -75,8 +83,6 @@ pub mod prompt_system_manager {
             None,
         )?;
 
-        msg!("Run create master edition v3");
-
         create_master_edition_v3(
             CpiContext::new_with_signer(
                 ctx.accounts.metadata_program.to_account_info(),
@@ -96,7 +102,9 @@ pub mod prompt_system_manager {
             Some(1),
         )?;
 
-        msg!("Minted NFT successfully");
+        emit!(NewCollection {
+            collection_id: id,
+        });
 
         Ok(())
     }
@@ -109,11 +117,8 @@ pub mod prompt_system_manager {
         symbol: String,
         uri: String,
     ) -> Result<()> {
-        msg!("Creating seeds");
         let id_bytes = id_collection.to_le_bytes();
         let id_nft_bytes = id_nft.to_le_bytes();
-
-        msg!("fucker: {:?}, {:?}", id_bytes, id_nft_bytes);
 
         let seeds = &[
             "mint".as_bytes(),
@@ -121,8 +126,6 @@ pub mod prompt_system_manager {
             id_nft_bytes.as_ref(),
             &[ctx.bumps.mint],
         ];
-
-        msg!("Run mint_to");
 
         mint_to(
             CpiContext::new_with_signer(
@@ -136,8 +139,6 @@ pub mod prompt_system_manager {
             ),
             1, // 1 token
         )?;
-
-        msg!("Run create metadata accounts v3");
 
         create_metadata_accounts_v3(
             CpiContext::new_with_signer(
@@ -174,8 +175,6 @@ pub mod prompt_system_manager {
             None,
         )?;
 
-        msg!("Run create master edition v3");
-
         create_master_edition_v3(
             CpiContext::new_with_signer(
                 ctx.accounts.metadata_program.to_account_info(),
@@ -195,7 +194,10 @@ pub mod prompt_system_manager {
             Some(1),
         )?;
 
-        msg!("Minted NFT successfully");
+        emit!(NftCreated {
+            collection_id: id_collection,
+            nft_id: id_nft,
+        });
 
         Ok(())
     }

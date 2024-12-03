@@ -119,8 +119,16 @@ pub struct MintToCollection<'info> {
     )]
     /// CHECK:
     pub nft_metadata: UncheckedAccount<'info>,
-    /// CHECK:
-    pub collection: UncheckedAccount<'info>,
+    #[account( 
+        seeds = ["mint".as_bytes(), id_collection.to_le_bytes().as_ref()], 
+        bump,
+    )]
+    pub collection_mint: InterfaceAccount<'info, Mint>,
+    #[account( 
+        associated_token::mint = collection_mint,
+        associated_token::authority = payer,
+    )]
+    pub collection: InterfaceAccount<'info, TokenAccount>,
 }
 
 #[derive(Accounts)]
