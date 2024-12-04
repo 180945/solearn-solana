@@ -4,11 +4,11 @@
 skip-lint = false
 
 [programs.localnet]
-solearn_solana = "8avCUgenAc7caGLPACHgjrcsyvqUPHf75wcGLpPCrDdk"
+solearn_solana = "GKcNsg7fGp4U5Sh3EhzU27zf136DqzDgfb2MJKRqo1cs"
 prompt_system_manager = "8CgzLBj4wq4pwKMv52BGnhaJLE22LEsv7obNTJtASNps"
 
 [programs.devnet]
-solearn_solana = "8avCUgenAc7caGLPACHgjrcsyvqUPHf75wcGLpPCrDdk"
+solearn_solana = "GKcNsg7fGp4U5Sh3EhzU27zf136DqzDgfb2MJKRqo1cs"
 prompt_system_manager = "8CgzLBj4wq4pwKMv52BGnhaJLE22LEsv7obNTJtASNps"
 
 [registry]
@@ -23,6 +23,7 @@ test = "yarn ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 test_solearn = "yarn ts-mocha -p ./tsconfig.json -t 1000000 tests/solearn_solana.ts"
 test_init_account = "yarn ts-mocha -p ./tsconfig.json -t 1000000 tests/solearn_init_account.ts"
 test_create_collection = "yarn ts-mocha -p ./tsconfig.json -t 1000000 tests/devnet_prompt_system_manger.ts"
+test_stake = "yarn ts-mocha -p ./tsconfig.json -t 1000000 tests/devnet_solearn_stake.ts"
 
 [test]
 startup_wait = 5000

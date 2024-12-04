@@ -1,20 +1,13 @@
-import { randomBytes } from 'node:crypto';
 import { describe, it } from 'node:test';
 import * as anchor from '@coral-xyz/anchor';
 import { BN, type Program } from '@coral-xyz/anchor';
 import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
 import {
-  MINT_SIZE,
-  TOKEN_2022_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-  createAssociatedTokenAccountIdempotentInstruction,
-  createInitializeMint2Instruction,
-  createMintToInstruction,
   getAssociatedTokenAddressSync,
-  getMinimumBalanceForRentExemptMint,
 } from '@solana/spl-token';
-import { Keypair, LAMPORTS_PER_SOL, SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY, PublicKey, SystemProgram, Transaction, type TransactionInstruction } from '@solana/web3.js';
+import { Keypair, SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY, PublicKey } from '@solana/web3.js';
 const TOKEN_PROGRAM = TOKEN_PROGRAM_ID;
 const IDL = require('../target/idl/prompt_system_manager.json');
 IDL.address = new PublicKey("8CgzLBj4wq4pwKMv52BGnhaJLE22LEsv7obNTJtASNps");
