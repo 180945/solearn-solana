@@ -84,8 +84,6 @@ pub mod solearn {
         ctx.accounts.vault_wallet_owner_pda.bump = ctx.bumps.vault_wallet_owner_pda;
         msg!("vault PDA bump seed: {}", ctx.bumps.vault_wallet_owner_pda);
 
-        
-
         Ok(())
     }
 
@@ -166,7 +164,8 @@ pub mod solearn {
             ctx.accounts.sol_learn_account.last_epoch += n;
         }
 
-        if ctx.accounts.sol_learn_account.miner_minimum_stake > ctx.accounts.miner_account.stake_amount
+        if ctx.accounts.sol_learn_account.miner_minimum_stake
+            > ctx.accounts.miner_account.stake_amount
         {
             return Err(SolLearnError::MustGreatThanMinStake.into());
         }
@@ -273,17 +272,17 @@ pub mod solearn {
                 return Err(SolLearnError::InvalidModelIndex.into());
             }
 
-            let miner_key_extracted: Vec<u8> = data[(model_index as usize) * 32..(model_index as usize + 1) * 32].to_vec();
+            let miner_key_extracted: Vec<u8> =
+                data[(model_index as usize) * 32..(model_index as usize + 1) * 32].to_vec();
             if miner_key_extracted == miner_key.try_to_vec()? {
                 data.drain((model_index as usize) * 32..(model_index as usize + 1) * 32);
-             
+
                 // Update the account data
                 ctx.accounts.miners_of_model.data = data;
                 ctx.accounts.miner_account.is_active = false;
             } else {
                 return Err(SolLearnError::MinerNotRegistered.into());
             }
-            
         }
 
         Ok(())
@@ -471,7 +470,11 @@ pub mod solearn {
         Ok((t.values.len() as u64) / 50)
     }
 
-    pub fn get_assignment(ctx: Context<ReadAssignmentVld>, assignment_id: u64, field_name: String) -> Result<Vec<u8>> {
+    pub fn get_assignment(
+        ctx: Context<ReadAssignmentVld>,
+        assignment_id: u64,
+        field_name: String,
+    ) -> Result<Vec<u8>> {
         let asgnmt = &ctx.accounts.assignment;
         if asgnmt.id != assignment_id {
             return Err(SolLearnError::Unauthorized.into());
@@ -594,7 +597,6 @@ pub mod solearn {
         msg!("tasks len: {}", tasks.values.len());
         msg!("bump: {}", tasks.bump);
 
-
         for i in 0..n {
             let rand_uint = random_number(
                 &&Clock::get()?,
@@ -603,23 +605,28 @@ pub mod solearn {
             );
 
             let miner_ind = (rand_uint as usize) % (miners_of_model.data.len() / 32);
-            msg!("random number {} and miner #{} was chosen", rand_uint, miner_ind);
+            msg!(
+                "random number {} and miner #{} was chosen",
+                rand_uint,
+                miner_ind
+            );
 
-            let miner_bytes = miners_of_model.data.drain(miner_ind*32..(miner_ind+1)*32).collect::<Vec<u8>>();
+            let miner_bytes = miners_of_model
+                .data
+                .drain(miner_ind * 32..(miner_ind + 1) * 32)
+                .collect::<Vec<u8>>();
             let miner = Pubkey::new_from_array(miner_bytes.try_into().unwrap());
             msg!("miner chosen: {:?}", miner);
 
-
-
             acc.assignment_number += 1;
             let assignment_id = acc.assignment_number;
-            
+
             let mut data = vec![];
             data.extend_from_slice(&assignment_id.to_le_bytes());
             data.extend_from_slice(&inference_id.to_le_bytes());
             data.extend_from_slice(&miner.to_bytes());
             data.push(1);
-            
+
             tasks.push_task(Task::new(FnType::CreateAssignment, data.clone()));
             msg!("push task: {:?}", data);
 
@@ -630,9 +637,11 @@ pub mod solearn {
         }
 
         for miner in selected_miners {
-            miners_of_model.data.extend_from_slice(miner.to_bytes().as_ref());
+            miners_of_model
+                .data
+                .extend_from_slice(miner.to_bytes().as_ref());
         }
-        
+
         let cpi_accounts = Transfer {
             from: ctx.accounts.miner_staking_wallet.to_account_info(),
             to: ctx.accounts.vault_staking_wallet.to_account_info(),
@@ -697,7 +706,7 @@ pub mod solearn {
         if value == 0 {
             return Err(SolLearnError::ZeroValue.into());
         }
-        
+
         // let from = ctx.accounts.signer.to_account_info();
         // let to = ctx.accounts.vault_wallet_owner_pda.to_account_info();
         // if **from.try_borrow_lamports()? < value {
@@ -734,7 +743,11 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn seize_miner_role(ctx: Context<SeizeMinerRoleVld>, assignment_id: u64, inference_id: u64) -> Result<()> {
+    pub fn seize_miner_role(
+        ctx: Context<SeizeMinerRoleVld>,
+        assignment_id: u64,
+        inference_id: u64,
+    ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
         let inference = &mut ctx.accounts.infs;
         let assignment = &mut ctx.accounts.assignment;
@@ -816,9 +829,6 @@ pub mod solearn {
         // inference.assignments.push(assignment.id);
         inference.digests.values.push(digest.to_bytes());
 
-        
-
-
         emit!(SolutionSubmission {
             assignment_id,
             sender: ctx.accounts.signer.key(),
@@ -847,7 +857,7 @@ pub mod solearn {
 
         if assignment_id != assignment.id {
             msg!("assignment_id: {} {}", assignment_id, assignment.id);
-            
+
             return Err(SolLearnError::Unauthorized.into());
         }
         if inference.id != infer_id {
@@ -855,7 +865,11 @@ pub mod solearn {
             return Err(SolLearnError::Unauthorized.into());
         }
         if ctx.accounts.signer.key() != assignment.worker {
-            msg!("worker: {} {}", ctx.accounts.signer.key(), assignment.worker);
+            msg!(
+                "worker: {} {}",
+                ctx.accounts.signer.key(),
+                assignment.worker
+            );
             return Err(SolLearnError::Unauthorized.into());
         }
         if assignment.role != 1 {
@@ -966,7 +980,11 @@ pub mod solearn {
         Ok(())
     }
 
-    pub fn resolve_inference(ctx: Context<UpdateAssignmentVld>, assignment_id: u64, inference_id: u64) -> Result<()> {
+    pub fn resolve_inference(
+        ctx: Context<UpdateAssignmentVld>,
+        assignment_id: u64,
+        inference_id: u64,
+    ) -> Result<()> {
         let acc = &mut ctx.accounts.sol_learn_account;
         let inference = &mut ctx.accounts.infs;
         let assignment = &mut ctx.accounts.assignment;
@@ -1000,8 +1018,15 @@ pub mod solearn {
                     to: ctx.accounts.token_recipient.to_account_info(),
                     authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
                 };
+                let k = acc.key();
+                let seeds = [
+                    b"vault",
+                    k.as_ref(),
+                    &[ctx.accounts.vault_wallet_owner_pda.bump],
+                ];
+                let signer_seeds = &[&seeds[..]];
                 let cpi_program = ctx.accounts.token_program.to_account_info();
-                let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+                let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
                 token::transfer(cpi_ctx, value)?;
 
                 // let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
@@ -1019,10 +1044,13 @@ pub mod solearn {
                 data.extend_from_slice(&inference.processed_miner.to_bytes());
 
                 tasks.push_task(Task::new(FnType::SlashMiner, data));
-
             }
         } else if inference.status == 2 {
-            msg!("commit_timeout: {} vs {}", inference.commit_timeout, Clock::get()?.slot);
+            msg!(
+                "commit_timeout: {} vs {}",
+                inference.commit_timeout,
+                Clock::get()?.slot
+            );
             if Clock::get()?.slot > inference.commit_timeout {
                 msg!("total_commit: {}", voting_info.total_commit);
                 if voting_info.total_commit + 1 >= inference.assignments.len() as u8 {
@@ -1035,8 +1063,11 @@ pub mod solearn {
                         to: ctx.accounts.token_recipient.to_account_info(),
                         authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
                     };
+                    let k = acc.key();
+                    let seeds = [b"vault", k.as_ref(), &[ctx.accounts.vault_wallet_owner_pda.bump]];
+                    let signer_seeds = &[&seeds[..]];
                     let cpi_program = ctx.accounts.token_program.to_account_info();
-                    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+                    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
                     token::transfer(cpi_ctx, value)?;
 
                     // let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
@@ -1069,7 +1100,6 @@ pub mod solearn {
             {
                 let tasks = &mut ctx.accounts.tasks;
                 if !filter_commitment(acc, inference, assignment, dao_receivers, tasks)? {
-                    msg!("afdasfasfsa 1");
                     //  handle_not_enough_vote(ctx.accounts.infs.id);
                     let value = inference.value + inference.fee_l2 + inference.fee_treasury;
                     let cpi_accounts = Transfer {
@@ -1077,11 +1107,12 @@ pub mod solearn {
                         to: ctx.accounts.token_recipient.to_account_info(),
                         authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
                     };
+                    let k = acc.key();
+                    let seeds = [b"vault", k.as_ref(), &[ctx.accounts.vault_wallet_owner_pda.bump]];
+                    let signer_seeds = &[&seeds[..]];
                     let cpi_program = ctx.accounts.token_program.to_account_info();
-                    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-                    msg!("afdasfasfsa 2");
+                    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
                     token::transfer(cpi_ctx, value)?;
-                    msg!("afdasfasfsa 3");
 
                     // let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
                     // let to = ctx.accounts.recipient.to_account_info();
@@ -1136,10 +1167,12 @@ pub mod solearn {
             let _assignment_id = u64::from_le_bytes(data[1..9].try_into().unwrap());
 
             let pubkey = assignment.worker;
+            msg!("assignment_id: {} recipient {:?}", assignment_id, pubkey);
             let mut value_bytes = [0u8; 8];
             value_bytes.copy_from_slice(&data[9..17]);
             let v = u64::from_le_bytes(value_bytes);
-            if ctx.accounts.token_recipient.key() != pubkey {
+
+            if ctx.accounts.token_recipient.owner.key() != pubkey {
                 return Err(SolLearnError::WrongRecipient.into());
             }
             let set_vote = data[16];
@@ -1154,7 +1187,9 @@ pub mod solearn {
             let mut value_bytes = [0u8; 8];
             value_bytes.copy_from_slice(&data[33..41]);
             let v = u64::from_le_bytes(value_bytes);
-            if ctx.accounts.token_recipient.key() != pubkey {
+            msg!("no assignment id, recipient {:?}", pubkey);
+
+            if ctx.accounts.token_recipient.owner.key() != pubkey {
                 return Err(SolLearnError::WrongRecipient.into());
             }
             v
@@ -1164,8 +1199,15 @@ pub mod solearn {
             to: ctx.accounts.token_recipient.to_account_info(),
             authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
         };
+        let k = ctx.accounts.sol_learn_account.key();
+        let seeds = [
+            b"vault",
+            k.as_ref(),
+            &[ctx.accounts.vault_wallet_owner_pda.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
         let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
         token::transfer(cpi_ctx, value)?;
 
         // let from = ctx.accounts.vault_wallet_owner_pda.to_account_info();
@@ -1261,8 +1303,15 @@ pub mod solearn {
                 to: ctx.accounts.token_recipient.to_account_info(),
                 authority: ctx.accounts.vault_wallet_owner_pda.to_account_info(),
             };
+            let k = ctx.accounts.sol_learn_account.key();
+            let seeds = [
+                b"vault",
+                k.as_ref(),
+                &[ctx.accounts.vault_wallet_owner_pda.bump],
+            ];
+            let signer_seeds = &[&seeds[..]];
             let cpi_program = ctx.accounts.token_program.to_account_info();
-            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
             token::transfer(cpi_ctx, token_fine)?;
         }
 

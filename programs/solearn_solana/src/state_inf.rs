@@ -314,6 +314,8 @@ pub struct CreateAssignmentVld<'info> {
 pub struct PayMinerVld<'info> {
 	#[account(mut)]
 	pub tasks: Account<'info, Tasks>,
+    #[account()]
+    pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
 	#[account(mut,
         seeds = [b"assignment", assignment_id.to_le_bytes().as_ref()],
         bump = assignment.bump

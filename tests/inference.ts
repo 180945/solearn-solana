@@ -90,14 +90,14 @@ export async function initProgram(_s) {
   console.log({ connection: _s.connection });
   _s.program = new anchor.Program<Solearn>(IDL, _s.provider);
 
-  const [aliceTokenAccountA, aliceTokenAccountB, bobTokenAccountA, bobTokenAccountB] = [_s.alice, _s.bob].flatMap((keypair) =>
+  const [aliceTokenAccountA, aliceTokenAccountB, bobTokenAccountA, bobTokenAccountB, adminTokenAccountA, _] = [_s.alice, _s.bob, _s.admin].flatMap((keypair) =>
     [_s.tokenMintA, _s.tokenMintB].map((mint) => getAssociatedTokenAddressSync(mint.publicKey, keypair.publicKey, false, TOKEN_PROGRAM)),
   );
 
   const [eveTkn1, eveTkn2, domTkn1, domTkn2] = [_s.eve, _s.dom].flatMap((keypair) =>
     [_s.tokenMintA, _s.tokenMintB].map((mint) => getAssociatedTokenAddressSync(mint.publicKey, keypair.publicKey, false, TOKEN_PROGRAM)),
   );
-  Object.assign(_s, { aliceTokenAccountA, eveTkn1, eveTkn2, domTkn1, domTkn2 });
+  
 
   // Airdrops to users, and creates two tokens mints 'A' and 'B'"
   const minimumLamports = await getMinimumBalanceForRentExemptMint(_s.connection);
@@ -125,7 +125,7 @@ export async function initProgram(_s) {
     {
       mint: _s.tokenMintA.publicKey,
       authority: _s.alice.publicKey,
-      ataDetails: [{ ata: aliceTokenAccountA, owner: _s.alice.publicKey }, { ata: eveTkn1, owner: _s.eve.publicKey }, { ata: domTkn1, owner: _s.dom.publicKey }],
+      ataDetails: [{ ata: aliceTokenAccountA, owner: _s.alice.publicKey }, { ata: eveTkn1, owner: _s.eve.publicKey }, { ata: domTkn1, owner: _s.dom.publicKey }, { ata: bobTokenAccountA, owner: _s.bob.publicKey }, { ata: adminTokenAccountA, owner: _s.admin.publicKey }],
     },
     {
       mint: _s.tokenMintB.publicKey,
@@ -137,18 +137,28 @@ export async function initProgram(_s) {
     ...(mintDetails.ataDetails.map(d => createAssociatedTokenAccountIdempotentInstruction(_s.provider.publicKey, d.ata, d.owner, mintDetails.mint, TOKEN_PROGRAM))),
     ...(mintDetails.ataDetails.map(d => createMintToInstruction(mintDetails.mint, d.ata, mintDetails.authority, 1_000_000_000, [], TOKEN_PROGRAM))),
   ]);
+  let tokenAccountToOwner = {}
+  tokenAccountToOwner[aliceTokenAccountA.toBase58()] = _s.alice;
+  tokenAccountToOwner[eveTkn1.toBase58()] = _s.eve;
+  tokenAccountToOwner[domTkn1.toBase58()] = _s.dom;
+  tokenAccountToOwner[bobTokenAccountA.toBase58()] = _s.bob;
+  tokenAccountToOwner[adminTokenAccountA.toBase58()] = _s.admin;
+  let ownerToTokenAccount = {}
+  ownerToTokenAccount[_s.alice.publicKey.toBase58()] = aliceTokenAccountA;
+  ownerToTokenAccount[_s.eve.publicKey.toBase58()] = eveTkn1;
+  ownerToTokenAccount[_s.dom.publicKey.toBase58()] = domTkn1;
+  ownerToTokenAccount[_s.bob.publicKey.toBase58()] = bobTokenAccountA;
+  ownerToTokenAccount[_s.admin.publicKey.toBase58()] = adminTokenAccountA;
+  Object.assign(_s, { aliceTokenAccountA, eveTkn1, eveTkn2, domTkn1, domTkn2, adminTokenAccountA, bobTokenAccountA, tokenAccountToOwner, ownerToTokenAccount });
 
   // Add all these instructions to our transaction
   let tx = new Transaction();
-  tx.instructions = [...sendSolInstructions];
+  tx.instructions = [...sendSolInstructions, ...createMintInstructions];
 
-  console.log('before sendAndConfirm', [_s.tokenMintA, _s.tokenMintB, _s.alice, _s.bob, _s.eve, _s.dom].map((a) => a.publicKey.toBase58()))
-  await _s.provider.sendAndConfirm(tx, []);
+  await _s.provider.sendAndConfirm(tx, [_s.tokenMintA, _s.tokenMintB]);
   tx = new Transaction();
-  console.log('before sendAndConfirm2')
-  tx.instructions = [...createMintInstructions, ...mintTokensInstructions];
-  await _s.provider.sendAndConfirm(tx, [_s.tokenMintA, _s.tokenMintB, _s.alice, _s.bob]);
-  console.log('before sendAndConfirm3')
+  tx.instructions = [...mintTokensInstructions];
+  await _s.provider.sendAndConfirm(tx, [_s.alice, _s.bob]);
 
   _s.accounts.admin = _s.admin.publicKey;
   _s.accounts.stakingToken = _s.tokenMintA.publicKey;
@@ -168,7 +178,6 @@ export async function initProgram(_s) {
     [Buffer.from('tasks'), _s.solearnAccount.publicKey.toBuffer()],
     _s.program.programId,
   )[0];
-  console.log('before initialize')
 
   const zeroValue = new BN(0);
   await sendAndConfirmTx(_s.provider, [await _s.program.instruction.initialize(
@@ -193,7 +202,6 @@ export async function initProgram(_s) {
     }
   )], [_s.admin, _s.solearnAccount]);
   _s.accounts.signer = _s.admin.publicKey;
-  console.log('before initialize2')
   await sendAndConfirmTx(_s.provider, [await _s.program.instruction.initialize2(
     {
       accounts: { ..._s.accounts }
@@ -395,6 +403,7 @@ describe('Solearn Bankrun example', function () {
       [Buffer.from('inference'), infId.toBuffer('le', 8)],
       _s.program.programId,
     )[0];
+
     _s.accounts.referrer = PublicKey.findProgramAddressSync(
       [Buffer.from('referrer'), _s.alice.publicKey.toBuffer()],
       _s.program.programId,
@@ -730,6 +739,62 @@ describe('Solearn Bankrun example', function () {
         undefined, 'le',
       );
       expect(taskCount.toNumber()).to.eq(5); // 3 miners, l2_owner, treasury
+    });
+
+    it('should pay miners after inference resolution', async function () {
+      const recipients = [assignedMiner, valMiners[0], valMiners[1], state.admin, state.bob];
+      const potentialMiners = [state.alice, state.eve, state.dom];
+      // console.log('recipients', recipients.map(r => r.publicKey.toBase58()), 'potential miners', potentialMiners.map(p => p.publicKey.toBase58()));
+      const tokenAccounts = [state.aliceTokenAccountA, state.eveTkn1, state.domTkn1, state.adminTokenAccountA, state.bobTokenAccountA];
+      // console.log('tokenAccounts', tokenAccounts.map(t => t.toBase58()));
+      const workerPubkey = [undefined, undefined, undefined, state.admin.publicKey, state.bob.publicKey];
+      // console.log('recipients', state.ownerToTokenAccount);
+      for (let i = 0; i < 5; i++) {
+        let assignmentId = new BN(1)
+        console.log('paying miner', i);
+        let assignedWorkerPubkey;
+        if (workerPubkey[i]) {
+          assignedWorkerPubkey = workerPubkey[i];
+          state.accounts.assignment = PublicKey.findProgramAddressSync(
+            [Buffer.from('assignment'), assignmentId.toBuffer('le', 8)],
+            state.program.programId,
+          )[0];
+        } else {
+          assignmentId = new BN(i + 1);
+          state.accounts.assignment = PublicKey.findProgramAddressSync(
+            [Buffer.from('assignment'), assignmentId.toBuffer('le', 8)],
+            state.program.programId,
+          )[0];
+          const buf = await simulateAndGetResponse(state.provider,
+            [await state.program.instruction.getAssignment(assignmentId, "worker", { accounts: { ...state.accounts } })],
+            [state.provider.wallet.payer]
+          );
+          let len = buf.readUInt32LE(0);
+          if (len > 4 + buf.length) {
+            throw new Error('Invalid getAssignment data length');
+          }
+          const readData = buf.subarray(4, 4 + len);
+          assignedWorkerPubkey = new PublicKey(
+            readData
+          );
+
+        }
+        
+        state.accounts.tokenRecipient = state.ownerToTokenAccount[assignedWorkerPubkey];
+        // console.log('tokenRecipient', state.accounts.tokenRecipient.toBase58());
+        await sendAndConfirmTx(state.provider, [await state.program.instruction.payMiner(assignmentId,
+          {
+            accounts: { ...state.accounts }
+          })], []);
+      }
+      let taskCount = new BN(
+        await simulateAndGetResponse(state.provider,
+          [await state.program.instruction.getTaskCount({ accounts: { ...state.accounts } })],
+          [state.provider.wallet.payer]
+        ),
+        undefined, 'le',
+      );
+      expect(taskCount.toNumber()).to.eq(0);
     });
   });
 

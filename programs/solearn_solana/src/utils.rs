@@ -237,14 +237,14 @@ pub fn filter_commitment(
                     tasks.push_task(Task::new(FnType::PayMiner, data));
                 }
                 if not_reached_limit && token_for_miner > 0 {
-                    dao_receivers.values.insert(
-                        0,
-                        DAOTokenReceiverInfo {
-                            receiver: assignment.worker,
-                            amount: share_token_per_validator,
-                            role: 1, // DAOTokenReceiverRole::Validator
-                        },
-                    );
+                    // dao_receivers.values.insert(
+                    //     0,
+                    //     DAOTokenReceiverInfo {
+                    //         receiver: assignment.worker,
+                    //         amount: share_token_per_validator,
+                    //         role: 1, // DAOTokenReceiverRole::Validator
+                    //     },
+                    // );
                 }
             } else {
                 if fee_for_miner > 0 {
@@ -260,14 +260,14 @@ pub fn filter_commitment(
                     tasks.push_task(Task::new(FnType::PayMiner, data));
                 }
                 if not_reached_limit && token_for_miner > 0 {
-                    dao_receivers.values.insert(
-                        0,
-                        DAOTokenReceiverInfo {
-                            receiver: assignment.worker,
-                            amount: token_for_miner,
-                            role: 0, // DAOTokenReceiverRole::Miner
-                        },
-                    );
+                    // dao_receivers.values.insert(
+                    //     0,
+                    //     DAOTokenReceiverInfo {
+                    //         receiver: assignment.worker,
+                    //         amount: token_for_miner,
+                    //         role: 0, // DAOTokenReceiverRole::Miner
+                    //     },
+                    // );
                 }
             }
         }
