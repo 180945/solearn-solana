@@ -119,21 +119,20 @@ pub fn _slash_miner(
 pub fn calculate_transferred_dao_token(
     acc: &mut SolLearnInfo,
     inference: &mut Inference,
-    dao_receivers: &mut DAOTokenReceiverInfos,
     is_referred: bool,
 ) -> Result<()> {
     let l2_owner_amt = (acc.dao_token_reward
         * u64::from(acc.dao_token_percentage.l2_owner_percentage))
         / PERCENTAGE_DENOMINATOR;
-    dao_receivers.values = Vec::new();
-    dao_receivers.values.insert(
-        0,
-        DAOTokenReceiverInfo {
-            receiver: acc.l2_owner,
-            amount: l2_owner_amt,
-            role: 5, // DAOTokenReceiverRole::L2Owner
-        },
-    );
+    // dao_receivers.values = Vec::new();
+    // dao_receivers.values.insert(
+    //     0,
+    //     DAOTokenReceiverInfo {
+    //         receiver: acc.l2_owner,
+    //         amount: l2_owner_amt,
+    //         role: 5, // DAOTokenReceiverRole::L2Owner
+    //     },
+    // );
 
     if is_referred {
         let referee_amt = (acc.dao_token_reward
@@ -143,23 +142,23 @@ pub fn calculate_transferred_dao_token(
             * u64::from(acc.dao_token_percentage.referrer_percentage))
             / PERCENTAGE_DENOMINATOR;
 
-        dao_receivers.values.insert(
-            0,
-            DAOTokenReceiverInfo {
-                receiver: inference.creator,
-                amount: referee_amt,
-                role: 4, // DAOTokenReceiverRole::Referee
-            },
-        );
+        // dao_receivers.values.insert(
+        //     0,
+        //     DAOTokenReceiverInfo {
+        //         receiver: inference.creator,
+        //         amount: referee_amt,
+        //         role: 4, // DAOTokenReceiverRole::Referee
+        //     },
+        // );
 
-        dao_receivers.values.insert(
-            0,
-            DAOTokenReceiverInfo {
-                receiver: inference.referrer,
-                amount: referer_amt,
-                role: 3, // DAOTokenReceiverRole::Referrer
-            },
-        );
+        // dao_receivers.values.insert(
+        //     0,
+        //     DAOTokenReceiverInfo {
+        //         receiver: inference.referrer,
+        //         amount: referer_amt,
+        //         role: 3, // DAOTokenReceiverRole::Referrer
+        //     },
+        // );
     }
 
     Ok(())
@@ -169,7 +168,6 @@ pub fn filter_commitment(
     acc: &mut SolLearnInfo,
     inference: &mut Inference,
     assignment: &mut Assignment,
-    dao_receivers: &mut DAOTokenReceiverInfos,
     tasks: &mut Tasks,
 ) -> Result<bool> {
     // let acc = &mut ctx.accounts.wh_account;
@@ -197,7 +195,7 @@ pub fn filter_commitment(
         / PERCENTAGE_DENOMINATOR;
 
     if not_reached_limit && remain_token > 0 {
-        calculate_transferred_dao_token(acc, inference, dao_receivers, is_referred)?;
+        calculate_transferred_dao_token(acc, inference, is_referred)?;
     }
 
     if is_match_miner_result {
@@ -273,14 +271,14 @@ pub fn filter_commitment(
         }
     }
 
-    if not_reached_limit && dao_receivers.values.len() > 0 {
-        let receivers_inf = dao_receivers;
-        for i in 0..receivers_inf.values.len() {
+    // if not_reached_limit && dao_receivers.values.len() > 0 {
+    //     let receivers_inf = dao_receivers;
+    //     for i in 0..receivers_inf.values.len() {
             // IDAOToken(dao_token).mint(
             //     receivers_inf[i].receiver,
             //     receivers_inf[i].amount
             // );
-        }
+        // }
 
         // emit DAOTokenMintedV2(
         //     _getChainID(),
@@ -288,7 +286,7 @@ pub fn filter_commitment(
         //     inferences[_inferenceId].modelAddress,
         //     receiversInf
         // );
-    }
+    // }
 
     if inference.fee_l2 > 0 {
         let mut data = vec![];

@@ -174,10 +174,6 @@ export async function initProgram(_s) {
     [Buffer.from('models'), _s.solearnAccount.publicKey.toBuffer()],
     _s.program.programId,
   )[0];
-  _s.accounts.tasks = PublicKey.findProgramAddressSync(
-    [Buffer.from('tasks'), _s.solearnAccount.publicKey.toBuffer()],
-    _s.program.programId,
-  )[0];
 
   const zeroValue = new BN(0);
   await sendAndConfirmTx(_s.provider, [await _s.program.instruction.initialize(
@@ -415,6 +411,10 @@ describe('Solearn Bankrun example', function () {
     state.accounts.votingInfo = PublicKey.findProgramAddressSync(
       [Buffer.from('voting_info'), new BN(infId).toBuffer('le', 8)],
       state.program.programId,
+    )[0];
+    _s.accounts.tasks = PublicKey.findProgramAddressSync(
+      [Buffer.from('tasks'), _s.solearnAccount.publicKey.toBuffer(), new BN(infId).toBuffer('le', 8)],
+      _s.program.programId,
     )[0];
 
     const modelInput = Buffer.from(randomBytes(32));

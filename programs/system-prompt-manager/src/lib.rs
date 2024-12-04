@@ -286,7 +286,7 @@ pub mod prompt_system_manager {
             token_program: ctx.accounts.token_program.to_account_info(),
             vault_staking_wallet: ctx.accounts.vault_staking_wallet.to_account_info(),
             miners_of_model: ctx.accounts.miners_of_model.to_account_info(),
-            dao_receiver_infos: ctx.accounts.miners_of_model.to_account_info(),
+            // dao_receiver_infos: ctx.accounts.miners_of_model.to_account_info(),
             voting_info: ctx.accounts.miners_of_model.to_account_info(),
         };
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);

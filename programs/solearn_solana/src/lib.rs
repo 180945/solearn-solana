@@ -11,7 +11,9 @@ use state::*;
 use state_inf::*;
 use utils::*;
 
-declare_id!("8avCUgenAc7caGLPACHgjrcsyvqUPHf75wcGLpPCrDdk");
+declare_id!("8kYaMUQqb3tgs8Mzk5uw4RzF3rn4fkRR9ESz1RdbzTBc");
+
+
 
 #[program]
 pub mod solearn {
@@ -88,13 +90,13 @@ pub mod solearn {
     }
 
     pub fn initialize2(ctx: Context<InitializeExtra>) -> Result<()> {
-        msg!("Instruction: Initialize2");
+        msg!("Instruction: Initialize2 (deprecated)");
 
-        let t = &mut ctx.accounts.tasks;
-        t.values = vec![];
-        t.bump = ctx.bumps.tasks;
+        // let t = &mut ctx.accounts.tasks;
+        // t.values = vec![];
+        // t.bump = ctx.bumps.tasks;
 
-        msg!("Tasks bump seed: {}", ctx.bumps.tasks);
+        // msg!("Tasks bump seed: {}", ctx.bumps.tasks);
 
         Ok(())
     }
@@ -466,6 +468,8 @@ pub mod solearn {
     }
 
     pub fn get_task_count(ctx: Context<ReadTasksVld>) -> Result<u64> {
+        msg!("Instruction: Get task count");
+
         let t = &ctx.accounts.tasks;
         Ok((t.values.len() as u64) / 50)
     }
@@ -593,6 +597,8 @@ pub mod solearn {
 
         let n = acc.miner_requirement;
         let mut selected_miners = Vec::with_capacity(n as usize);
+        msg!("before init tasks, n: {}", n);
+
         let tasks = &mut ctx.accounts.tasks;
         msg!("tasks len: {}", tasks.values.len());
         msg!("bump: {}", tasks.bump);
@@ -988,7 +994,7 @@ pub mod solearn {
         let acc = &mut ctx.accounts.sol_learn_account;
         let inference = &mut ctx.accounts.infs;
         let assignment = &mut ctx.accounts.assignment;
-        let dao_receivers = &mut ctx.accounts.dao_receiver_infos;
+        // let dao_receivers = &mut ctx.accounts.dao_receiver_infos;
         let voting_info = &mut ctx.accounts.voting_info;
 
         if ctx.accounts.token_recipient.key() != inference.creator {
@@ -1099,7 +1105,7 @@ pub mod solearn {
                 || voting_info.total_reveal == voting_info.total_commit
             {
                 let tasks = &mut ctx.accounts.tasks;
-                if !filter_commitment(acc, inference, assignment, dao_receivers, tasks)? {
+                if !filter_commitment(acc, inference, assignment, tasks)? {
                     //  handle_not_enough_vote(ctx.accounts.infs.id);
                     let value = inference.value + inference.fee_l2 + inference.fee_treasury;
                     let cpi_accounts = Transfer {
