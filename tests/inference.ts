@@ -25,6 +25,7 @@ import { Solearn } from "../target/types/solearn";
 import { confirmTransaction, createAccountsMintsAndTokenAccounts, makeKeypairs } from '@solana-developers/helpers';
 import { SYSTEM_PROGRAM_ID } from '@coral-xyz/anchor/dist/cjs/native/system';
 import { beforeEach } from 'mocha';
+import { keccak_256 } from "js-sha3";
 
 const SECONDS = 1000;
 
@@ -182,7 +183,7 @@ export async function initProgram(_s) {
     new BN(10), // 10s
     new BN(10), // 10s
     new BN(10), // 10s
-    new BN(1),
+    new BN(3),
     new BN(10), // 10 blocks
     new BN(100), // fine 1%
     zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, 
@@ -330,14 +331,12 @@ describe('Solearn Bankrun example', function () {
     const workerHub = _s.program;
 
     _s.accounts.signer = _s.alice.publicKey;
-    console.log('gagaagaggaga', 1);
     // await sendAndConfirmTx(_s.provider, [await workerHub.instruction.minerRegister(
     //   new BN(100000000),
     //   {
     //     accounts: { ..._s.accounts }
     //   }
     // )], [_s.alice]);
-    console.log('gagaagaggaga', 2);
     await sendAndConfirmTx(_s.provider, [await workerHub.instruction.joinForMinting(
       {
         accounts: { ..._s.accounts }
@@ -417,7 +416,6 @@ describe('Solearn Bankrun example', function () {
         accounts: { ..._s.accounts }
       })], [_s.alice]);
 
-    console.log('infer call finished')
     // TODO: assert token balances
     // const blockNumber = await getBlockNumber();
     // const block = await getBlock(blockNumber);
@@ -442,17 +440,20 @@ describe('Solearn Bankrun example', function () {
       undefined, 'le',
     );
     console.log('after calling infer, taskCount =', taskCount.toNumber());
-    expect(taskCount.toNumber()).to.eq(1);
+    expect(taskCount.toNumber()).to.eq(3);
 
-    let assignmentId = new BN(1);
-    _s.accounts.assignment = PublicKey.findProgramAddressSync(
-      [Buffer.from('assignment'), assignmentId.toBuffer('le', 8)],
-      _s.program.programId,
-    )[0];
-    await sendAndConfirmTx(_s.provider, [await workerHub.instruction.createAssignment(assignmentId,
-      {
-        accounts: { ..._s.accounts }
-      })], [_s.alice]);
+    
+    for (let i = 1; i <= 3; i++) {
+      let assignmentId = new BN(i);
+      _s.accounts.assignment = PublicKey.findProgramAddressSync(
+        [Buffer.from('assignment'), assignmentId.toBuffer('le', 8)],
+        _s.program.programId,
+      )[0];
+      await sendAndConfirmTx(_s.provider, [await workerHub.instruction.createAssignment(assignmentId,
+        {
+          accounts: { ..._s.accounts }
+        })], [_s.alice]);
+    }
 
     taskCount = new BN(
       await simulateAndGetResponse(_s.provider,
@@ -464,18 +465,27 @@ describe('Solearn Bankrun example', function () {
     console.log('after calling createAssignment, taskCount =', taskCount.toNumber());
     expect(taskCount.toNumber()).to.eq(0);
 
-    const buf = await simulateAndGetResponse(_s.provider,
-      [await workerHub.instruction.getAssignment(assignmentId, "worker", { accounts: { ..._s.accounts } })],
-      [_s.provider.wallet.payer]
-    );
-    let len = buf.readUInt32LE(0);
-    if (len > 4 + buf.length) {
-      throw new Error('Invalid getAssignment data length');
+    let assignedPubkey = [];
+    for (let i = 1; i <= 3; i++) {
+      let assignmentId = new BN(i);
+      _s.accounts.assignment = PublicKey.findProgramAddressSync(
+        [Buffer.from('assignment'), assignmentId.toBuffer('le', 8)],
+        _s.program.programId,
+      )[0];
+      const buf = await simulateAndGetResponse(_s.provider,
+        [await workerHub.instruction.getAssignment(new BN(i), "worker", { accounts: { ..._s.accounts } })],
+        [_s.provider.wallet.payer]
+      );
+      let len = buf.readUInt32LE(0);
+      if (len > 4 + buf.length) {
+        throw new Error('Invalid getAssignment data length');
+      }
+      const readData = buf.subarray(4, 4 + len);
+      let assignedWorkerPubkey = new PublicKey(
+        readData
+      );
+      assignedPubkey.push(assignedWorkerPubkey);
     }
-    const readData = buf.subarray(4, 4 + len);
-    let assignedWorkerPubkey = new PublicKey(
-      readData
-    );
     // console.log('assignedWorkerPubkey', assignedWorkerPubkey.toBase58());
     // console.log('vs potential miners', _s.alice.publicKey.toBase58(), _s.eve.publicKey.toBase58(), _s.dom.publicKey.toBase58());
 
@@ -496,28 +506,52 @@ describe('Solearn Bankrun example', function () {
       undefined, 'le',
     );
     // console.log('next_a_id', nextAssignmentId);
-    expect(nextAssignmentId.toNumber()).to.eq(2);
+    expect(nextAssignmentId.toNumber()).to.eq(4);
 
-    const assignedMiners = [_s.alice, _s.eve, _s.dom].filter((miner) => miner.publicKey.toBase58() === assignedWorkerPubkey.toBase58());
-    expect(assignedMiners.length).to.eq(1);
+    const minerLst = [_s.alice, _s.eve, _s.dom];
+    let pubkeyToMiner = {};
+    for (let i = 0; i < minerLst.length; i++) {
+      pubkeyToMiner[minerLst[i].publicKey.toBase58()] = minerLst[i];
+    }
+
+    const assignedMiners = assignedPubkey.map((pubkey) => pubkeyToMiner[pubkey.toBase58()]);
+    expect(assignedMiners.length).to.eq(3);
 
     return assignedMiners;
   }
 
   describe('Test staking', async function () {
     let assignedMiner;
+    let valMiners;
     let inferenceId = 1;
-    let assignmentId = 1;
+    let miningAssignmentId = 1;
+    let valAssignmentIds = [2, 3];
+    const nonces = [42, 4242];
+    let solution = Buffer.from("solution for test");
     
     it('should call infer and get assigned', async function () {
       await initProgram(state);
       const res = await simulateInferAndAssign(state, inferenceId);
-      console.log('infer & assigned', res.map(m => m.publicKey.toBase58()));
+      // console.log('infer & assigned', res.map(m => m.publicKey.toBase58()));
+      let accountExists = {};
+      for (let k of Object.values(state)) {
+        if (k?.publicKey?.toBase58()) accountExists[k?.publicKey?.toBase58()] = true;
+      }
+      let dup = {};
+      for (let i = 0; i < res.length; i++) {
+        // console.log('look for', res[i].publicKey.toBase58());
+        // console.log('in accountExists', accountExists);
+        expect(accountExists[res[i].publicKey.toBase58()]).to.be.true;
+        expect(dup[res[i].publicKey.toBase58()]).to.be.undefined;
+        dup[res[i].publicKey.toBase58()] = true;
+      }
       assignedMiner = res[0];
+      valMiners = res.slice(1);
+      console.log('assignedMiner', assignedMiner.publicKey.toBase58());
+      console.log('valMiners', valMiners.map(m => m.publicKey.toBase58()));
     });
 
     it('should topup inference', async function () {
-      console.log('begin topup inference');
       state.accounts.signer = state.alice.publicKey;
       state.accounts.miner = state.alice.publicKey;
       state.accounts.minerAccount = PublicKey.findProgramAddressSync(
@@ -539,9 +573,13 @@ describe('Solearn Bankrun example', function () {
         [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
         state.program.programId,
       )[0];
+      state.accounts.assignment = PublicKey.findProgramAddressSync(
+        [Buffer.from('assignment'), new BN(miningAssignmentId).toBuffer('le', 8)],
+        state.program.programId,
+      )[0];
 
       await sendAndConfirmTx(state.provider, [await state.program.instruction.seizeMinerRole(
-        new BN(assignmentId),
+        new BN(miningAssignmentId),
         new BN(inferenceId),
         {
           accounts: { ...state.accounts }
@@ -573,11 +611,85 @@ describe('Solearn Bankrun example', function () {
         [Buffer.from('voting_info'), new BN(inferenceId).toBuffer('le', 8)],
         state.program.programId,
       )[0];         
+      state.accounts.assignment = PublicKey.findProgramAddressSync(
+        [Buffer.from('assignment'), new BN(miningAssignmentId).toBuffer('le', 8)],
+        state.program.programId,
+      )[0];
       
-      const solution = Buffer.from("solution for test");
-      await sendAndConfirmTx(state.provider, [await state.program.instruction.submitSolution(new BN(inferenceId), new BN(assignmentId), solution, {
+      await sendAndConfirmTx(state.provider, [await state.program.instruction.submitSolution(new BN(miningAssignmentId), new BN(inferenceId), solution, {
         accounts: { ...state.accounts }
       })], [assignedMiner]);
+    });
+
+    it('should commit', async () => {
+      for (let i = 0; i < nonces.length; i++) {
+        
+        let buf = Buffer.concat([new BN(nonces[i]).toBuffer('le', 8), valMiners[i].publicKey.toBuffer(), solution]);
+        // console.log('commit content', buf);
+        const commitment = Buffer.from(keccak_256.update(buf).digest());
+
+        // const commitment = ethers.solidityPackedKeccak256(['uint64', 'bytes32', 'bytes'], [nonces[i], valMiners[i].publicKey.toBuffer(), ethers.hexlify(solution)]);
+        state.accounts.signer = valMiners[i].publicKey;
+        state.accounts.miner = valMiners[i].publicKey;
+        state.accounts.minerAccount = PublicKey.findProgramAddressSync(
+          [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
+          state.program.programId,
+        )[0];
+        state.accounts.daoReceiverInfos = PublicKey.findProgramAddressSync(
+          [Buffer.from('dao_receiver_infos'), state.accounts.solLearnAccount.toBuffer(), new BN(inferenceId).toBuffer('le', 8)],
+          state.program.programId,
+        )[0]; 
+        state.accounts.votingInfo = PublicKey.findProgramAddressSync(
+          [Buffer.from('voting_info'), new BN(inferenceId).toBuffer('le', 8)],
+          state.program.programId,
+        )[0];         
+        state.accounts.assignment = PublicKey.findProgramAddressSync(
+          [Buffer.from('assignment'), new BN(valAssignmentIds[i]).toBuffer('le', 8)],
+          state.program.programId,
+        )[0];
+
+        for (let i = 0; i < 2; i++) {
+          await makeBlock(state.provider);
+          // sleep for 200ms
+          await new Promise(r => setTimeout(r, 200));
+        }
+        await sendAndConfirmTx(state.provider, [await state.program.instruction.commit(new BN(valAssignmentIds[i]), new BN(inferenceId), commitment, {
+          accounts: { ...state.accounts }
+        })], [valMiners[i]]);
+      }
+    });
+
+    it('should reveal', async () => {
+      for (let i = 0; i < nonces.length; i++) {
+        state.accounts.signer = valMiners[i].publicKey;
+        state.accounts.miner = valMiners[i].publicKey;
+        state.accounts.minerAccount = PublicKey.findProgramAddressSync(
+          [Buffer.from('miner'), state.accounts.miner.toBuffer(), state.accounts.solLearnAccount.toBuffer()],
+          state.program.programId,
+        )[0];
+        state.accounts.daoReceiverInfos = PublicKey.findProgramAddressSync(
+          [Buffer.from('dao_receiver_infos'), state.accounts.solLearnAccount.toBuffer(), new BN(inferenceId).toBuffer('le', 8)],
+          state.program.programId,
+        )[0]; 
+        state.accounts.votingInfo = PublicKey.findProgramAddressSync(
+          [Buffer.from('voting_info'), new BN(inferenceId).toBuffer('le', 8)],
+          state.program.programId,
+        )[0];         
+        state.accounts.assignment = PublicKey.findProgramAddressSync(
+          [Buffer.from('assignment'), new BN(valAssignmentIds[i]).toBuffer('le', 8)],
+          state.program.programId,
+        )[0];
+        state.accounts.tokenRecipient = state.aliceTokenAccountA;
+
+        for (let i = 0; i < 10; i++) {
+          await makeBlock(state.provider);
+          // sleep for 200ms
+          await new Promise(r => setTimeout(r, 200));
+        }
+        await sendAndConfirmTx(state.provider, [await state.program.instruction.reveal(new BN(valAssignmentIds[i]), new BN(inferenceId), new BN(nonces[i]), solution, {
+          accounts: { ...state.accounts }
+        })], [valMiners[i]]);
+      }
     });
       
     it("should resolve inference", async () => {
@@ -595,15 +707,19 @@ describe('Solearn Bankrun example', function () {
         [Buffer.from('voting_info'), new BN(inferenceId).toBuffer('le', 8)],
         state.program.programId,
       )[0];         
+      state.accounts.assignment = PublicKey.findProgramAddressSync(
+        [Buffer.from('assignment'), new BN(miningAssignmentId).toBuffer('le', 8)],
+        state.program.programId,
+      )[0];
       state.accounts.tokenRecipient = state.aliceTokenAccountA;
-      console.log('state.accounts.solLearnAccount', state.accounts.solLearnAccount.toBase58(), state.accounts.tokenRecipient);
-      for (let i = 0; i < 21; i++) {
+      // console.log('state.accounts.solLearnAccount', state.accounts.solLearnAccount.toBase58(), state.accounts.tokenRecipient);
+      for (let i = 0; i < 10; i++) {
         await makeBlock(state.provider);
         // sleep for 200ms
         await new Promise(r => setTimeout(r, 200));
       }
       
-      await sendAndConfirmTx(state.provider, [await state.program.instruction.resolveInference(new BN(inferenceId), new BN(assignmentId), {
+      await sendAndConfirmTx(state.provider, [await state.program.instruction.resolveInference(new BN(miningAssignmentId), new BN(inferenceId), {
         accounts: { ...state.accounts }
       })], [state.alice]);
       let taskCount = new BN(
@@ -613,7 +729,7 @@ describe('Solearn Bankrun example', function () {
         ),
         undefined, 'le',
       );
-      expect(taskCount.toNumber()).to.eq(1);
+      expect(taskCount.toNumber()).to.eq(5); // 3 miners, l2_owner, treasury
     });
   });
 
