@@ -10,7 +10,7 @@ import { SYSVAR_CLOCK_PUBKEY, PublicKey, Keypair} from '@solana/web3.js';
 
 const TOKEN_PROGRAM = TOKEN_PROGRAM_ID;
 const IDL = require('../target/idl/solearn.json');
-
+// IDL.address = new PublicKey("8fXqHtGHRwr7Mdif7HJhsV66qwSWLnozjabo2uEHPFZ1");
 import { Solearn } from "../target/types/solearn";
 import { makeKeypairs } from '@solana-developers/helpers';
 import { SYSTEM_PROGRAM_ID } from '@coral-xyz/anchor/dist/cjs/native/system';
@@ -23,7 +23,7 @@ const SECONDS = 1000;
 const ANCHOR_SLOW_TEST_THRESHOLD = 40 * SECONDS;
 
 describe('Solearn Deploy', () => {
-  const [alice, bob, solearnAccount, model1, model2] = makeKeypairs(8);
+  const [bob, solearnAccount, model1, model2] = makeKeypairs(8);
 
   let provider, connection, program;
   // We're going to reuse these accounts across multiple tests
@@ -46,7 +46,7 @@ describe('Solearn Deploy', () => {
     const adminImportded = programProvider.wallet;
     const admin = Keypair.fromSecretKey((adminImportded as NodeWallet).payer.secretKey);
 
-    const stakingTokenPubKey = new PublicKey("6qKcWsgczLGbpDH6426r4govbd1HgDMg6j5LLikx3bop");
+    const stakingTokenPubKey = new PublicKey("9XiufKRNgX2ZKtTxY5eejVVvTsXLsr2q9VAr4iwGBAju");
 
     accounts.admin = admin.publicKey;
     accounts.stakingToken = stakingTokenPubKey;
@@ -67,21 +67,21 @@ describe('Solearn Deploy', () => {
     const tx = await program.methods
         .initialize(
             new BN(1000000),
-            new BN(10), // 10 blocks
-            new BN(100000000), // EAI decimal 6  => 10 EAI
+            new BN(10000), // 10000s
+            new BN(1000000), // EAI decimal 6  => 1 EAI
             bob.publicKey, // treasury address
             new BN(100), // 1% 
             new BN(100), // 1% 
             new BN(5), // dont know this value
-            new BN(10), // 10s
-            new BN(10), // 10s
-            new BN(10), // 10s
-            new BN(10), // 10s
-            new BN(1),
-            new BN(10), // 10 blocks
+            new BN(1000), // 1000s
+            new BN(1000), // 1000s
+            new BN(1000), // 1000s
+            new BN(1000), // 1000s
+            new BN(3),
+            new BN(10000), // 10000 blocks
             new BN(100), // fine 1%
             zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, 
-            new BN(10), // 10s unstaking
+            new BN(120), // 120s unstaking
         )
         .accounts({
             ...accounts
@@ -90,6 +90,9 @@ describe('Solearn Deploy', () => {
         .rpc();
 
     console.log({tx});
+
+    console.log("treary: ", bob);
+    console.log("solearn account: ", solearnAccount);
   }
 
   it('Test init account on testnet', async () => {
