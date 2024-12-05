@@ -68,11 +68,9 @@ pub struct CreateNFT<'info> {
 pub struct MintToCollection<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    #[account(mut)]
-    pub payer: Signer<'info>,
     #[account( 
         init,
-        payer = payer, 
+        payer = authority, 
         mint::decimals = 0,
         mint::authority = authority,
         mint::freeze_authority = authority,
@@ -84,9 +82,9 @@ pub struct MintToCollection<'info> {
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(
         init_if_needed,
-        payer = payer,
+        payer = authority,
         associated_token::mint = mint,
-        associated_token::authority = payer,
+        associated_token::authority = authority,
     )]
     pub token_account: InterfaceAccount<'info, TokenAccount>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -119,8 +117,16 @@ pub struct MintToCollection<'info> {
     )]
     /// CHECK:
     pub nft_metadata: UncheckedAccount<'info>,
-    /// CHECK:
-    pub collection: UncheckedAccount<'info>,
+    #[account( 
+        seeds = ["mint".as_bytes(), id_collection.to_le_bytes().as_ref()], 
+        bump,
+    )]
+    pub collection_mint: InterfaceAccount<'info, Mint>,
+    // #[account( 
+    //     associated_token::mint = mint,
+    //     associated_token::authority = authority,
+    // )]
+    pub collection: InterfaceAccount<'info, TokenAccount>,
 }
 
 #[derive(Accounts)]

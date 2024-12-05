@@ -26,7 +26,7 @@ pub struct Initialize<'info> {
         seeds = [b"models", sol_learn_account.key().as_ref()], 
         bump
     )]
-    pub models: Account<'info, Models>,
+    pub models: Box<Account<'info, Models>>,
     #[account(
         init, 
         // realloc = 8 + wh_account.len(),
@@ -44,14 +44,8 @@ pub struct Initialize<'info> {
 pub struct InitializeExtra<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
-    #[account(
-        init, 
-        payer = admin, 
-        space = 1024,
-        seeds = [b"tasks", sol_learn_account.key().as_ref()], 
-        bump
-    )]
-    pub tasks: Box<Account<'info, Tasks>>,
+    
+    // pub tasks: Box<Account<'info, Tasks>>,
     #[account(mut, constraint = sol_learn_account.admin == admin.key())]
     pub sol_learn_account: Box<Account<'info, SolLearnInfo>>,
     pub system_program: Program<'info, System>,
@@ -74,7 +68,7 @@ pub struct AddModel<'info> {
         // seeds = [b"models", sol_learn_account.key().as_ref()], 
         // bump = models.bump,
     )]
-    pub models: Account<'info, Models>,
+    pub models: Box<Account<'info, Models>>,
     #[account(
         init, 
         payer = admin, 
@@ -102,7 +96,7 @@ pub struct RemoveModel<'info> {
         // seeds = [b"models", sol_learn_account.key().as_ref()], 
         // bump = models.bump,
     )]
-    pub models: Account<'info, Models>,
+    pub models: Box<Account<'info, Models>>,
     #[account(
         mut, 
         close = admin, 
@@ -124,7 +118,7 @@ pub struct MinerRegister<'info> {
         // seeds = [b"models", sol_learn_account.key().as_ref()], 
         // bump = models.bump,
     )]
-    pub models: Account<'info, Models>,
+    pub models: Box<Account<'info, Models>>,
     #[account(
         init, 
         payer = miner, 
@@ -279,7 +273,7 @@ pub struct JoinForMinting<'info> {
         bump = miners_of_model.bump
     )]
     pub miners_of_model: Box<Account<'info, MinersOfModel>>,
-    pub models: Account<'info, Models>,
+    pub models: Box<Account<'info, Models>>,
     pub system_program: Program<'info, System>,
     pub sysvar_clock: Sysvar<'info, Clock>,
 }
