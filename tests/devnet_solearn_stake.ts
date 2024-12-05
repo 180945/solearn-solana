@@ -11,6 +11,7 @@ import {
 import {Keypair, SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY, PublicKey, sendAndConfirmTransaction, Transaction} from '@solana/web3.js';
 const TOKEN_PROGRAM = TOKEN_PROGRAM_ID;
 const IDL = require('../target/idl/solearn.json');
+IDL.address = new PublicKey(process.env.PROGRAM_ID);
 import { Solearn } from "../target/types/solearn";
 import bs58 from 'bs58';
 const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
@@ -41,20 +42,13 @@ describe('Solearn Staking', () => {
     const connection = programProvider.connection;
 
     const stakingTokenPubKey = new PublicKey("9XiufKRNgX2ZKtTxY5eejVVvTsXLsr2q9VAr4iwGBAju");
-    const solLearnAccount = Keypair.fromSecretKey(new Uint8Array([
-      83,  22,  31, 239,  44, 219, 245, 200, 109, 157,  47,
-      75,  61,  33,  86, 196,  13, 247, 155,   4,  65,  88,
-      74, 157, 110,  30, 210,   2,   5,  95, 134, 248, 128,
-      73, 226, 121, 116,  68,   4, 149, 229,  37,  24,  57,
-       8,  39, 224,  40, 130, 196,  39, 201, 197,  20,  97,
-     182,  91,  17, 192, 139, 193, 139, 240,  11
-   ]));
+    const solLearnAccount = new PublicKey(process.env.SOLEARN_ACCOUNT);
 
-    console.log("solearn account: ", solLearnAccount.publicKey.encode());
+    console.log("solearn account: ", solLearnAccount);
 
     accounts.admin = admin.publicKey;
     accounts.stakingToken = stakingTokenPubKey;
-    accounts.solLearnAccount = solLearnAccount.publicKey;
+    accounts.solLearnAccount = solLearnAccount;
 
     const vault_wallet_owner = PublicKey.findProgramAddressSync(
       [Buffer.from('vault'), accounts.solLearnAccount.toBuffer()],
