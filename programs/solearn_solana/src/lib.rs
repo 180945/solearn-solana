@@ -33,7 +33,6 @@ pub mod solearn {
         reveal_duration: u64,
         penalty_duration: u64,
         miner_requirement: u8,
-        blocks_per_epoch: u64, // todo: consider to remove this value, use epoch_duration instead
         fine_percentage: u16,
         dao_token_reward: u64,
         miner_percentage: u16,
@@ -70,7 +69,6 @@ pub mod solearn {
         sol_learn_account.reveal_duration = reveal_duration;
         sol_learn_account.penalty_duration = penalty_duration;
         sol_learn_account.miner_requirement = miner_requirement;
-        sol_learn_account.blocks_per_epoch = blocks_per_epoch;
         sol_learn_account.fine_percentage = fine_percentage;
         sol_learn_account.dao_token_reward = dao_token_reward;
         sol_learn_account.dao_token_percentage.miner_percentage = miner_percentage;
@@ -159,8 +157,7 @@ pub mod solearn {
             - ctx.accounts.sol_learn_account.last_time)
             / ctx.accounts.sol_learn_account.epoch_duration;
         if n > 0 {
-            ctx.accounts.sol_learn_account.last_time =
-                ctx.accounts.sysvar_clock.unix_timestamp as u64;
+            ctx.accounts.sol_learn_account.last_time = ctx.accounts.sol_learn_account.last_time + n * ctx.accounts.sol_learn_account.epoch_duration;
             ctx.accounts.sol_learn_account.last_epoch += n;
         }
 
@@ -241,8 +238,7 @@ pub mod solearn {
             - ctx.accounts.sol_learn_account.last_time)
             / ctx.accounts.sol_learn_account.epoch_duration;
         if n > 0 {
-            ctx.accounts.sol_learn_account.last_time =
-                ctx.accounts.sysvar_clock.unix_timestamp as u64;
+            ctx.accounts.sol_learn_account.last_time = ctx.accounts.sol_learn_account.last_time + n * ctx.accounts.sol_learn_account.epoch_duration;
             ctx.accounts.sol_learn_account.last_epoch += n;
         }
 
@@ -263,6 +259,7 @@ pub mod solearn {
             ctx.accounts.miner_account.reward += (ctx.accounts.sol_learn_account.last_epoch
                 - ctx.accounts.miner_account.last_epoch)
                 * ctx.accounts.sol_learn_account.reward_per_epoch;
+            ctx.accounts.miner_account.last_epoch = ctx.accounts.sol_learn_account.last_epoch;
 
             // remove from MinersOfModel
             let miner_key = ctx.accounts.miner.key();
@@ -353,8 +350,7 @@ pub mod solearn {
             - ctx.accounts.sol_learn_account.last_time)
             / ctx.accounts.sol_learn_account.epoch_duration;
         if n > 0 {
-            ctx.accounts.sol_learn_account.last_time =
-                ctx.accounts.sysvar_clock.unix_timestamp as u64;
+            ctx.accounts.sol_learn_account.last_time = ctx.accounts.sol_learn_account.last_time + n * ctx.accounts.sol_learn_account.epoch_duration;
             ctx.accounts.sol_learn_account.last_epoch += n;
         }
 
@@ -492,30 +488,6 @@ pub mod solearn {
             "commitment" => Ok(asgnmt.commitment.to_vec()),
             "digest" => Ok(asgnmt.digest.to_vec()),
             _ => Err(SolLearnError::UnknownStructField.into()),
-        }
-    }
-
-    pub fn update_epoch(ctx: Context<UpdateEpochVld>, epoch_id: u64) -> Result<()> {
-        let acc = &mut ctx.accounts.sol_learn_account;
-
-        let slot_number = Clock::get()?.slot;
-        let epoch_passed = (slot_number - acc.last_block) / acc.blocks_per_epoch;
-        if epoch_passed > 0 {
-            if epoch_id > acc.last_epoch {
-                return Err(SolLearnError::InvalidEpochId.into());
-            }
-
-            acc.last_block += acc.blocks_per_epoch * epoch_passed;
-            let reward_in_current_epoch =
-                (acc.reward_per_epoch * acc.blocks_per_epoch) / BLOCK_PER_YEAR;
-
-            let ms = &mut ctx.accounts.miner_reward;
-            ms.total_miner = acc.total_miner;
-            ms.epoch_reward = reward_in_current_epoch;
-            acc.last_epoch += 1;
-            Ok(())
-        } else {
-            return Err(SolLearnError::EpochRewardUpToDate.into());
         }
     }
 
