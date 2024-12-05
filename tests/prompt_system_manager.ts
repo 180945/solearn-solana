@@ -129,54 +129,9 @@ describe('Prompt System Manager Bankrun test', () => {
       }
     )], [alice]);
 
-
-  //     #[account(
-  //         init_if_needed,
-  //         payer = payer,
-  //         associated_token::mint = mint,
-  //         associated_token::authority = payer,
-  //     )]
-  //     pub token_account: InterfaceAccount<'info, TokenAccount>,
-  //     pub associated_token_program: Program<'info, AssociatedToken>,
-  //     pub rent: Sysvar<'info, Rent>,
-  //     pub system_program: Program<'info, System>,
-  //     pub token_program: Program<'info, Token>,
-  //     pub metadata_program: Program<'info, Metadata>,
-  //     #[account(
-  //         mut,
-  //         seeds = [
-  //             b"metadata".as_ref(),
-  //             metadata_program.key().as_ref(),
-  //             mint.key().as_ref(),
-  //             b"edition".as_ref(),
-  //         ],
-  //         bump,
-  //         seeds::program = metadata_program.key()
-  //     )]
-  //     /// CHECK:
-  //     pub master_edition_account: UncheckedAccount<'info>,
-  //     #[account(
-  //         mut,
-  //         seeds = [
-  //             b"metadata".as_ref(),
-  //             metadata_program.key().as_ref(),
-  //             mint.key().as_ref(),
-  //         ],
-  //         bump,
-  //         seeds::program = metadata_program.key()
-  //     )]
-  //     /// CHECK:
-  //     pub nft_metadata: UncheckedAccount<'info>,
-  //     /// CHECK:
-  //     pub collection: UncheckedAccount<'info>,
-  // }
-
     let nft_id = new BN(1);
-    accounts.collection = accounts.mint;
-    
-    console.log("fucker");
-    console.log(accounts.mint);
-
+    accounts.collection = accounts.tokenAccount;
+    accounts.collectionMint = accounts.mint;
     accounts.mint = PublicKey.findProgramAddressSync(
       [Buffer.from('mint'), collection_id.toArrayLike(Buffer, 'le', 8), nft_id.toArrayLike(Buffer, 'le', 8)],
       program.programId,
