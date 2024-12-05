@@ -10,7 +10,7 @@ import {
 import { Keypair, SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY, PublicKey } from '@solana/web3.js';
 const TOKEN_PROGRAM = TOKEN_PROGRAM_ID;
 const IDL = require('../target/idl/prompt_system_manager.json');
-IDL.address = new PublicKey("8CgzLBj4wq4pwKMv52BGnhaJLE22LEsv7obNTJtASNps");
+IDL.address = new PublicKey("7rPLAQ9UN8vMhxWBTzp2DHLfoqpihXaXhoGJ6WiCNUjY");
 const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
 import { PromptSystemManager } from "../target/types/prompt_system_manager";
@@ -57,7 +57,7 @@ describe('Prompt System Manager Bankrun test', () => {
       accounts.metadataProgram,
     )[0];
 
-    // const tx = await program.methods
+    // const createNft = await program.methods
     //     .createSingleNft(
     //         collection_id,
     //         "test",
@@ -70,10 +70,12 @@ describe('Prompt System Manager Bankrun test', () => {
     //     .signers([admin])
     //     .rpc();
 
-    // console.log({tx});
+    // console.log({createNft});
+
+  
 
 
-    let nft_id = new BN(1);
+    let nft_id = new BN(201);
     accounts.collection = accounts.tokenAccount;
     accounts.collectionMint = accounts.mint;
     accounts.mint = PublicKey.findProgramAddressSync(
@@ -91,18 +93,21 @@ describe('Prompt System Manager Bankrun test', () => {
       accounts.metadataProgram,
     )[0];
 
-    // await sendAndConfirmTx(provider, [await program.instruction.mintToCollection(
-    //     collection_id,
-    //     nft_id,
-    //     "test",
-    //     "T",
-    //     "test",
-    //     {
-    //       accounts: {...accounts}
-    //     }
-    //   )], [alice]);
+    // init to create nft
+    const tx1 = await program.methods.initMintToCollection
+    (
+        collection_id,
+        nft_id,
+    )
+    .accounts({
+        ...accounts
+    })
+    .signers([admin])
+    .rpc();
 
-    const tx = await program.methods.mintToCollection
+    console.log({tx1});
+
+    const tx2 = await program.methods.mintToCollection
     (
         collection_id,
         nft_id,
@@ -116,7 +121,7 @@ describe('Prompt System Manager Bankrun test', () => {
     .signers([admin])
     .rpc();
 
-    console.log({tx});
+    console.log({tx2});
     
   }
 

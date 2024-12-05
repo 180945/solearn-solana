@@ -147,6 +147,16 @@ describe('Prompt System Manager Bankrun test', () => {
       accounts.metadataProgram,
     )[0];
 
+    await sendAndConfirmTx(provider, [await program.instruction.initMintToCollection(
+      collection_id,
+      nft_id,
+      {
+        accounts: {...accounts}
+      }
+    )], [alice]);
+
+    console.log({accounts});
+
     // createAssociatedTokenAccountIdempotentInstruction(alice.publicKey, accounts.token_account, alice.publicKey, accounts.mint, TOKEN_PROGRAM)
     await sendAndConfirmTx(provider, [await program.instruction.mintToCollection(
       collection_id,

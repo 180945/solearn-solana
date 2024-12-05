@@ -13,7 +13,7 @@ use anchor_spl::metadata::{
 use solearn_solana::cpi::accounts::InferVld;
 use anchor_spl::token::{self, Transfer};
 
-declare_id!("8CgzLBj4wq4pwKMv52BGnhaJLE22LEsv7obNTJtASNps");
+declare_id!("7rPLAQ9UN8vMhxWBTzp2DHLfoqpihXaXhoGJ6WiCNUjY");
 
 #[event]
 pub struct NewCollection {
@@ -109,6 +109,38 @@ pub mod prompt_system_manager {
         Ok(())
     }
 
+    // separate to reduce cu
+    pub fn init_mint_to_collection(
+        ctx: Context<InitNFTOfCollection>,
+        id_collection: u64,
+        id_nft: u64,
+    ) -> Result<()> {
+        let id_bytes = id_collection.to_le_bytes();
+        let id_nft_bytes = id_nft.to_le_bytes();
+
+        let seeds = &[
+            "mint".as_bytes(),
+            id_bytes.as_ref(),
+            id_nft_bytes.as_ref(),
+            &[ctx.bumps.mint],
+        ];
+
+        mint_to(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                MintTo {
+                    authority: ctx.accounts.authority.to_account_info(),
+                    to: ctx.accounts.token_account.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
+                },
+                &[&seeds[..]],
+            ),
+            1, // 1 token
+        )?;
+
+        Ok(())
+    }
+
     pub fn mint_to_collection(
         ctx: Context<MintToCollection>,
         id_collection: u64,
@@ -131,19 +163,6 @@ pub mod prompt_system_manager {
         if ctx.accounts.authority.key() != ctx.accounts.collection.owner || ctx.accounts.collection_mint.key() !=  ctx.accounts.collection.mint {
             return Err(SystemPromptManagerError::InvalidCollection.into());
         }
-
-        mint_to(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                MintTo {
-                    authority: ctx.accounts.authority.to_account_info(),
-                    to: ctx.accounts.token_account.to_account_info(),
-                    mint: ctx.accounts.mint.to_account_info(),
-                },
-                &[&seeds[..]],
-            ),
-            1, // 1 token
-        )?;
 
         create_metadata_accounts_v3(
             CpiContext::new_with_signer(

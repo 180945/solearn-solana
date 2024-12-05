@@ -65,7 +65,7 @@ pub struct CreateNFT<'info> {
 
 #[derive(Accounts)]
 #[instruction(id_collection: u64, id_nft: u64)]
-pub struct MintToCollection<'info> {
+pub struct InitNFTOfCollection<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account( 
@@ -83,6 +83,32 @@ pub struct MintToCollection<'info> {
     #[account(
         init_if_needed,
         payer = authority,
+        associated_token::mint = mint,
+        associated_token::authority = authority,
+    )]
+    pub token_account: InterfaceAccount<'info, TokenAccount>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+#[instruction(id_collection: u64, id_nft: u64)]
+pub struct MintToCollection<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account( 
+        mut,
+        mint::decimals = 0,
+        mint::authority = authority,
+        mint::freeze_authority = authority,
+        seeds = ["mint".as_bytes(), 
+                id_collection.to_le_bytes().as_ref(),
+                id_nft.to_le_bytes().as_ref()], 
+        bump,
+    )]
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(
         associated_token::mint = mint,
         associated_token::authority = authority,
     )]
