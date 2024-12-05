@@ -11,7 +11,7 @@ import {
 import {Keypair, SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY, PublicKey, sendAndConfirmTransaction, Transaction} from '@solana/web3.js';
 const TOKEN_PROGRAM = TOKEN_PROGRAM_ID;
 const IDL = require('../target/idl/solearn.json');
-IDL.address = new PublicKey(process.env.PROGRAM_ID);
+IDL.address = new PublicKey(process.env.SOLEARN_PROGRAM_ID ? process.env.SOLEARN_PROGRAM_ID : IDL.address );
 import { Solearn } from "../target/types/solearn";
 import bs58 from 'bs58';
 const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
@@ -128,7 +128,7 @@ describe('Solearn Staking', () => {
   }
 
 
-  it('Create an NFT!', async () => {
+  it('Devnet Create an NFT!', async () => {
     await initProgram();
   });
 });

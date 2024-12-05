@@ -78,7 +78,6 @@ describe('Solearn Deploy', () => {
             new BN(1000), // 1000s
             new BN(1000), // 1000s
             new BN(3),
-            new BN(10000), // 10000 blocks
             new BN(100), // fine 1%
             zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, 
             new BN(120), // 120s unstaking
@@ -95,7 +94,7 @@ describe('Solearn Deploy', () => {
     console.log("solearn account: ", solearnAccount);
   }
 
-  it('Test init account on testnet', async () => {
+  it('Devnet Test init account on testnet', async () => {
     await initProgram();    
   });
 });

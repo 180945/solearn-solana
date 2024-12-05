@@ -120,7 +120,7 @@ describe('Prompt System Manager Bankrun test', () => {
     
   }
 
-  it('Create an NFT!', async () => {
+  it('Devnet Create an NFT!', async () => {
     await initProgram();
   });
 });

@@ -189,7 +189,6 @@ export async function initProgram(_s) {
     new BN(10), // 10s
     new BN(10), // 10s
     new BN(3),
-    new BN(10), // 10 blocks
     new BN(100), // fine 1%
     zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, 
     new BN(10), // 10s unstaking
